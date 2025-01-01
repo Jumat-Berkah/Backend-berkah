@@ -2,37 +2,40 @@ package main
 
 import (
 	"Backend-berkah/config"
-	"Backend-berkah/model"
 	"Backend-berkah/routes"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 )
 
 func main() {
-	// Muat environment variables
+	// Load environment variables
 	config.LoadEnv()
 
-	// Koneksi ke database
+	// Connect to the database
 	config.ConnectDatabase()
 
-	// Migrasi tabel
-	err := config.DB.AutoMigrate(
-		&model.User{}, // Tambahkan tabel lainnya di sini jika ada tabel lain
-	)
-	if err != nil {
-		log.Fatalf("Gagal migrasi database: %v", err)
-	}
-	log.Println("Migrasi database berhasil!")
-
-	// Buat router baru
+	// Create a new router
 	router := mux.NewRouter()
 
-	// Daftarkan auth routes
-	routes.RegisterAuthRoutes(router)
+	// Add a healthcheck route
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Service is running"))
+	})
 
-	// Jalankan server
-	log.Println("Server berjalan di http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	// Register routes
+	routes.RegisterAuthRoutes(router)
+	
+	// Use PORT from the environment or default to 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Default port if PORT is not set
+	}
+
+	// Start the server
+	log.Printf("Server running on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }
