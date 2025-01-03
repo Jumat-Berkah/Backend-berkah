@@ -1,7 +1,4 @@
 {
-  "build": {
-    "builder": "Docker"
-  },
   "deploy": {
     "startCommand": "./main",
     "restartPolicyType": "ALWAYS",
