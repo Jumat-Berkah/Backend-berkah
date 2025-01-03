@@ -4,11 +4,15 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/controller"
 	"Backend-berkah/helper"
+	"log"
 	"net/http"
 	// Middleware untuk autentikasi dan otorisasi JWT
 )
 
 func URL(w http.ResponseWriter, r *http.Request) {
+	// Log request method dan path
+	log.Printf("Incoming request: %s %s", r.Method, r.URL.Path)
+	
 	if config.SetAccessControlHeaders(w, r) {
 		return // If it's a preflight request, return early.
 	}

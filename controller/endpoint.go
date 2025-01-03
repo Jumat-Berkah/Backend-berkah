@@ -19,9 +19,10 @@ func GetData(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
+
 }
 
-// Post Data
+// Post Data 
 func PostData(w http.ResponseWriter, r *http.Request) {
 	var user model.User
 
