@@ -4,11 +4,14 @@ FROM golang:1.20
 # Set working directory dalam container
 WORKDIR /app
 
-# Copy semua file dari direktori lokal ke dalam container
-COPY . .
+# Copy file go.mod dan go.sum terlebih dahulu
+COPY go.mod go.sum ./
 
-# Mengunduh dependensi Go
-RUN go mod tidy
+# Unduh dependensi sebelum copy source code
+RUN go mod download
+
+# Copy semua file proyek ke dalam container
+COPY . .
 
 # Build aplikasi
 RUN go build -o main .
