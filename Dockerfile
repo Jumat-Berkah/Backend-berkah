@@ -1,6 +1,9 @@
 # Menggunakan base image untuk Golang
 FROM golang:1.20
 
+# Set Go Proxy untuk memastikan dependensi dapat diunduh
+ENV GOPROXY=https://proxy.golang.org,direct
+
 # Set working directory dalam container
 WORKDIR /app
 
