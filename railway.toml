@@ -3,14 +3,11 @@
 # Nama proyek Railway
 name = "Backend-berkah"
 
-# Entry point untuk deployment
-[build]
-  builder = "Docker" # Menggunakan Docker untuk membangun aplikasi
-
+# Perintah untuk menjalankan aplikasi
 [deploy]
-  startCommand = "./main" # Perintah untuk menjalankan aplikasi setelah deploy
-  restartPolicyType = "ALWAYS" # Pastikan aplikasi selalu berjalan
-  restartPolicyMaxRetries = 5  # Coba restart hingga 5 kali jika aplikasi gagal
+  startCommand = "./main"
+  restartPolicyType = "ALWAYS"
+  restartPolicyMaxRetries = 5
 
 # Variabel environment yang dibutuhkan untuk koneksi ke database
 [variables]
