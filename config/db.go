@@ -1,6 +1,7 @@
 package config
 
 import (
+	"Backend-berkah/model"
 	"fmt"
 	"log"
 	"os"
@@ -38,4 +39,15 @@ func ConnectDatabase() {
 
 	DB = db
 	fmt.Println("Koneksi ke database berhasil!")
+}
+
+func autoMigrateModels() {
+	err := DB.AutoMigrate(
+		&model.User{},
+		&model.Token{},
+	)
+	if err != nil {
+		log.Fatalf("Failed to auto-migrate models: %v", err)
+	}
+	log.Println("Database models migrated successfully!")
 }
