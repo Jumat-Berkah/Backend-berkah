@@ -70,66 +70,72 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 
 
-// Login Handler
 func Login(w http.ResponseWriter, r *http.Request) {
-	var input model.LoginInput
-	var user model.User
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
 
-	// Parse JSON request body
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
+    // Decode JSON input ke LoginInput
+    var loginInput model.LoginInput
+    err := json.NewDecoder(r.Body).Decode(&loginInput)
+    if err != nil {
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)
+        return
+    }
 
-	// Cari user berdasarkan email
-	if err := config.DB.Preload("Role").Where("email = ?", input.Email).First(&user).Error; err != nil {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-		return
-	}
+    // Cari pengguna berdasarkan email
+    var user model.User
+    result := config.DB.Preload("Role").Where("email = ?", loginInput.Email).First(&user)
+    if result.Error != nil {
+        http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+        return
+    }
 
-	// Cek password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-		return
-	}
+    // Cocokkan password
+    err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password))
+    if err != nil {
+        http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+        return
+    }
 
-	// Redirect ke dashboard berdasarkan role
-	var dashboard string
-	if user.Role.Name == "admin" && r.URL.Path == "/api/admin/login" {
-		dashboard = "/admin/dashboard"
-	} else if user.Role.Name == "user" && r.URL.Path == "/api/user/login" {
-		dashboard = "/user/dashboard"
-	} else {
-		http.Error(w, "Access denied. Role mismatch for this route.", http.StatusForbidden)
-		return
-	}
+    // Periksa apakah role sesuai
+    if user.Role.Name != loginInput.Role {
+        http.Error(w, "Role mismatch", http.StatusUnauthorized)
+        return
+    }
 
-	// Buat token JWT
-	expirationTime := time.Now().Add(24 * time.Hour) // Token berlaku selama 24 jam
-	claims := &model.Claims{
-		UserID: user.ID,
-		Role:   user.Role.Name, // Role dari tabel roles
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(config.JwtKey))
-	if err != nil {
-		http.Error(w, "Failed to create token", http.StatusInternalServerError)
-		return
-	}
+    // Buat token JWT
+    claims := model.Claims{
+        UserID: user.ID,
+        Role:   user.Role.Name,
+        RegisteredClaims: jwt.RegisteredClaims{
+            ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Token berlaku selama 24 jam
+        },
+    }
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    tokenString, err := token.SignedString([]byte(config.JwtKey))
+    if err != nil {
+        http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+        return
+    }
 
-	// Kirim respons token, role, dan dashboard
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":   "Login successful",
-		"user_id":   user.ID,
-		"role":      user.Role.Name,
-		"token":     tokenString,
-		"dashboard": dashboard,
-	})
+    // Kirim response dengan token
+    response := map[string]interface{}{
+        "user": map[string]interface{}{
+            "id":       user.ID,
+            "email":    user.Email,
+            "username": user.Username,
+            "role":     user.Role.Name,
+        },
+        "token": tokenString,
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(response)
 }
+
+
 
 
 
