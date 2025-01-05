@@ -27,13 +27,6 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "GET" && path == "/healthcheck":
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Service is running"))
-	
-
-	// dashboard berdasarkan role
-	case method == "POST" && path == "/admin/dashboard":
-		controller.Login(w, r)
-	case method == "POST" && path == "/user/dashboard":
-		controller.Login(w, r)
 	default:
 		helper.NotFound(w, r)
 	}

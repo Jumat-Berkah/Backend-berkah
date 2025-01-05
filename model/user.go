@@ -13,6 +13,15 @@ type Role struct {
 	UpdatedAt time.Time
 }
 
+type Token struct {
+	ID        uint      `gorm:"primaryKey"`
+	UserID    uint      `gorm:"not null"` // Relasi ke User
+	User      User      `gorm:"foreignKey:UserID"`
+	Token     string    `gorm:"unique;not null"`
+	Role      string    `gorm:"not null"`
+	CreatedAt time.Time
+	ExpiresAt time.Time // Token Expiry Time
+}
 type User struct {
 	ID        uint      `gorm:"primaryKey"`
 	Email     string    `gorm:"unique;not null"`

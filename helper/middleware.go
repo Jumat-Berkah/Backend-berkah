@@ -59,3 +59,24 @@ func RoleMiddleware(allowedRoles ...string) func(http.Handler) http.Handler {
         })
     }
 }
+
+func ValidateTokenMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authorization header is missing", http.StatusUnauthorized)
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		var tokenRecord model.Token
+		err := config.DB.Where("token = ?", tokenString).First(&tokenRecord).Error
+		if err != nil {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+
+		// Token valid, lanjutkan ke handler berikutnya
+		next.ServeHTTP(w, r)
+	})
+}

@@ -1,7 +1,0 @@
-{
-  "deploy": {
-    "startCommand": "./main",
-    "restartPolicyType": "ALWAYS",
-    "restartPolicyMaxRetries": 5
-  }
-}

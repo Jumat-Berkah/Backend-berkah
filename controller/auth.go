@@ -2,6 +2,7 @@ package controller
 
 import (
 	"Backend-berkah/config"
+	"Backend-berkah/helper"
 	"Backend-berkah/model"
 	"encoding/json"
 	"net/http"
@@ -67,73 +68,96 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
-
-
+// function login user dan admin
 func Login(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost {
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
+	if r.Method != http.MethodPost {
+		helper.WriteResponse(w, http.StatusMethodNotAllowed, map[string]string{
+			"error": "Method not allowed",
+		})
+		return
+	}
 
-    // Decode JSON input ke LoginInput
-    var loginInput model.LoginInput
-    err := json.NewDecoder(r.Body).Decode(&loginInput)
-    if err != nil {
-        http.Error(w, "Invalid request payload", http.StatusBadRequest)
-        return
-    }
+	// Decode JSON input ke LoginInput
+	var loginInput model.LoginInput
+	err := json.NewDecoder(r.Body).Decode(&loginInput)
+	if err != nil {
+		helper.WriteResponse(w, http.StatusBadRequest, map[string]string{
+			"error": "Invalid request payload",
+		})
+		return
+	}
 
-    // Cari pengguna berdasarkan email
-    var user model.User
-    result := config.DB.Preload("Role").Where("email = ?", loginInput.Email).First(&user)
-    if result.Error != nil {
-        http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-        return
-    }
+	// Cari pengguna berdasarkan email
+	var user model.User
+	result := config.DB.Preload("Role").Where("email = ?", loginInput.Email).First(&user)
+	if result.Error != nil {
+		helper.WriteResponse(w, http.StatusUnauthorized, map[string]string{
+			"error": "Invalid email or password",
+		})
+		return
+	}
 
-    // Cocokkan password
-    err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password))
-    if err != nil {
-        http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-        return
-    }
+	// Cocokkan password
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password))
+	if err != nil {
+		helper.WriteResponse(w, http.StatusUnauthorized, map[string]string{
+			"error": "Invalid email or password",
+		})
+		return
+	}
 
-    // Periksa apakah role sesuai
-    if user.Role.Name != loginInput.Role {
-        http.Error(w, "Role mismatch", http.StatusUnauthorized)
-        return
-    }
+	// Periksa apakah role sesuai
+	if user.Role.Name != loginInput.Role {
+		helper.WriteResponse(w, http.StatusUnauthorized, map[string]string{
+			"error": "Role mismatch",
+		})
+		return
+	}
 
-    // Buat token JWT
-    claims := model.Claims{
-        UserID: user.ID,
-        Role:   user.Role.Name,
-        RegisteredClaims: jwt.RegisteredClaims{
-            ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Token berlaku selama 24 jam
-        },
-    }
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    tokenString, err := token.SignedString([]byte(config.JwtKey))
-    if err != nil {
-        http.Error(w, "Failed to generate token", http.StatusInternalServerError)
-        return
-    }
+	// Buat token JWT
+	claims := model.Claims{
+		UserID: user.ID,
+		Role:   user.Role.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Token berlaku selama 24 jam
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(config.JwtKey))
+	if err != nil {
+		helper.WriteResponse(w, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to generate token",
+		})
+		return
+	}
 
-    // Kirim response dengan token
-    response := map[string]interface{}{
-        "user": map[string]interface{}{
-            "id":       user.ID,
-            "email":    user.Email,
-            "username": user.Username,
-            "role":     user.Role.Name,
-        },
-        "token": tokenString,
-    }
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(response)
+	// Respons berdasarkan role
+	var responseMessage string
+	if user.Role.Name == "admin" {
+		responseMessage = "Welcome to the Admin Dashboard"
+	} else if user.Role.Name == "user" {
+		responseMessage = "Welcome to the User Dashboard"
+	} else {
+		helper.WriteResponse(w, http.StatusForbidden, map[string]string{
+			"error": "Role not recognized",
+		})
+		return
+	}
+
+	// Kirim respons dengan token dan pesan role
+	response := map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":       user.ID,
+			"email":    user.Email,
+			"username": user.Username,
+			"role":     user.Role.Name,
+		},
+		"message": responseMessage,
+		"token":   tokenString,
+	}
+	helper.WriteResponse(w, http.StatusOK, response)
 }
+
 
 
 
