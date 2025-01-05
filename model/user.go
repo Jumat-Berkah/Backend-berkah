@@ -13,6 +13,12 @@ type Role struct {
 	UpdatedAt time.Time
 }
 
+type BlacklistToken struct {
+    ID        uint      `gorm:"primaryKey"`
+    Token     string    `gorm:"unique;not null"`
+    ExpiresAt time.Time `gorm:"not null"`
+    CreatedAt time.Time
+}
 type Token struct {
 	ID        uint      `gorm:"primaryKey"`
 	UserID    uint      `gorm:"not null"` // Relasi ke User

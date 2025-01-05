@@ -45,6 +45,8 @@ func autoMigrateModels() {
 	err := DB.AutoMigrate(
 		&model.User{},
 		&model.Token{},
+		&model.Location{},
+		&model.BlacklistToken{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)

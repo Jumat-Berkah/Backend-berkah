@@ -15,6 +15,9 @@ func main() {
 	// Connect to the database
 	config.ConnectDatabase()
 
+	// auto migrate
+	config.DB.AutoMigrate()
+
 	// Use PORT from the environment or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {
