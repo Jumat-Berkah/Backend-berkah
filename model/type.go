@@ -10,3 +10,12 @@ type Location struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+type ActiveToken struct {
+	ID        uint      `gorm:"primaryKey"`               // ID unik untuk setiap token
+	UserID    uint      `gorm:"not null"`                // ID user yang memiliki token ini (relasi ke tabel User)
+	Token     string    `gorm:"unique;not null"`         // Token JWT
+	ExpiresAt time.Time `gorm:"not null"`                // Waktu kedaluwarsa token
+	CreatedAt time.Time `gorm:"autoCreateTime"`          // Waktu token dibuat
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`          // Waktu token terakhir diperbarui
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"Backend-berkah/config"
+	"Backend-berkah/helper"
 	"Backend-berkah/routes"
 	"log"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 func main() {
 	// Load environment variables
 	config.LoadEnv()
+
+	helper.MoveExpiredTokensToBlacklist()
 
 	// Connect to the database
 	config.ConnectDatabase()

@@ -34,6 +34,7 @@ type User struct {
 	Username  string    `gorm:"unique;not null"`
 	Password  string    `gorm:"not null"`
 	RoleID    uint      `gorm:"not null"`
+	ActiveTokens []ActiveToken `gorm:"foreignKey:UserID"`
 	Role      Role      `gorm:"foreignKey:RoleID"`
 	CreatedAt time.Time
 	UpdatedAt time.Time

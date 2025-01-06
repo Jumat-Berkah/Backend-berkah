@@ -2,7 +2,6 @@ package controller
 
 import (
 	"Backend-berkah/config"
-	"Backend-berkah/helper"
 	"Backend-berkah/model"
 	"encoding/json"
 	"net/http"
@@ -70,93 +69,106 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 // function login user dan admin
 func Login(w http.ResponseWriter, r *http.Request) {
+	// Validasi metode HTTP
 	if r.Method != http.MethodPost {
-		helper.WriteResponse(w, http.StatusMethodNotAllowed, map[string]string{
-			"error": "Method not allowed",
-		})
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Decode JSON input ke LoginInput
+	// Decode input
 	var loginInput model.LoginInput
-	err := json.NewDecoder(r.Body).Decode(&loginInput)
-	if err != nil {
-		helper.WriteResponse(w, http.StatusBadRequest, map[string]string{
-			"error": "Invalid request payload",
-		})
+	if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	// Cari pengguna berdasarkan email
 	var user model.User
-	result := config.DB.Preload("Role").Where("email = ?", loginInput.Email).First(&user)
-	if result.Error != nil {
-		helper.WriteResponse(w, http.StatusUnauthorized, map[string]string{
-			"error": "Invalid email or password",
-		})
+	if err := config.DB.Where("email = ?", loginInput.Email).First(&user).Error; err != nil {
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	// Cocokkan password
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password))
-	if err != nil {
-		helper.WriteResponse(w, http.StatusUnauthorized, map[string]string{
-			"error": "Invalid email or password",
-		})
-		return
-	}
-
-	// Periksa apakah role sesuai
-	if user.Role.Name != loginInput.Role {
-		helper.WriteResponse(w, http.StatusUnauthorized, map[string]string{
-			"error": "Role mismatch",
-		})
+	// Periksa password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password)); err != nil {
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
 	// Buat token JWT
+	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := model.Claims{
 		UserID: user.ID,
 		Role:   user.Role.Name,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Token berlaku selama 24 jam
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(config.JwtKey))
 	if err != nil {
-		helper.WriteResponse(w, http.StatusInternalServerError, map[string]string{
-			"error": "Failed to generate token",
-		})
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Respons berdasarkan role
-	var responseMessage string
-	if user.Role.Name == "admin" {
-		responseMessage = "Welcome to the Admin Dashboard"
-	} else if user.Role.Name == "user" {
-		responseMessage = "Welcome to the User Dashboard"
-	} else {
-		helper.WriteResponse(w, http.StatusForbidden, map[string]string{
-			"error": "Role not recognized",
-		})
+	// Simpan token ke tabel active_tokens
+	activeToken := model.ActiveToken{
+		UserID:    user.ID,
+		Token:     tokenString,
+		ExpiresAt: expirationTime,
+	}
+	if err := config.DB.Create(&activeToken).Error; err != nil {
+		http.Error(w, "Failed to save active token", http.StatusInternalServerError)
 		return
 	}
 
-	// Kirim respons dengan token dan pesan role
+	// Kirim respons
 	response := map[string]interface{}{
+		"message": "Login successful",
 		"user": map[string]interface{}{
 			"id":       user.ID,
 			"email":    user.Email,
 			"username": user.Username,
 			"role":     user.Role.Name,
 		},
-		"message": responseMessage,
-		"token":   tokenString,
+		"token": tokenString,
 	}
-	helper.WriteResponse(w, http.StatusOK, response)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
+
+
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+    // Ambil token dari header Authorization
+    token := r.Header.Get("Authorization")
+    if token == "" {
+        http.Error(w, "Token not provided", http.StatusUnauthorized)
+        return
+    }
+
+    // Tambahkan token ke tabel blacklist
+    blacklistedToken := model.BlacklistToken{
+        Token:     token,
+        ExpiresAt: time.Now().Add(24 * time.Hour), // Token kedaluwarsa dalam 24 jam
+    }
+    if err := config.DB.Create(&blacklistedToken).Error; err != nil {
+        http.Error(w, "Failed to blacklist token", http.StatusInternalServerError)
+        return
+    }
+
+    // Hapus token dari tabel active_tokens (opsional)
+    config.DB.Where("token = ?", token).Delete(&model.ActiveToken{})
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "status":  "success",
+        "message": "Logout successful, token blacklisted",
+    })
+}
+
+
 
 
 

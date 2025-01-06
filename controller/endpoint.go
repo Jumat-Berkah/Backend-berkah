@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -18,6 +19,28 @@ func GetDataLocation(w http.ResponseWriter, r *http.Request) {
     if r.Method != http.MethodGet {
         log.Println("Invalid method:", r.Method)
         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+
+    // Ambil token dari header Authorization
+    token := r.Header.Get("Authorization")
+    if token == "" {
+        log.Println("Token not provided")
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Periksa apakah token ada di blacklist atau telah kedaluwarsa
+    var blacklistedToken model.BlacklistToken
+    err := config.DB.Where("token = ?", token).First(&blacklistedToken).Error
+    if err == nil {
+        if time.Now().After(blacklistedToken.ExpiresAt) {
+            log.Println("Token is expired:", token)
+            http.Error(w, "Token expired", http.StatusUnauthorized)
+            return
+        }
+        log.Println("Token is blacklisted:", token)
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
 
@@ -46,6 +69,7 @@ func GetDataLocation(w http.ResponseWriter, r *http.Request) {
         "data":    locations,
     })
 }
+
 
 
 func CreateDataLocation(w http.ResponseWriter, r *http.Request) {
