@@ -10,6 +10,7 @@ import (
 var JwtKey []byte
 
 // LoadEnv untuk membaca file .env
+// LoadEnv untuk membaca file .env
 func LoadEnv() {
 	// Load file .env
 	err := godotenv.Load()
@@ -22,4 +23,5 @@ func LoadEnv() {
 	if len(JwtKey) == 0 {
 		log.Fatalf("JWT_SECRET not set in .env file")
 	}
+	log.Println("Environment variables loaded successfully!")
 }

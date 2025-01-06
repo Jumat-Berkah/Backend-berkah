@@ -9,10 +9,17 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // Register Handler
 func Register(w http.ResponseWriter, r *http.Request) {
+	// Periksa metode HTTP
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed. Please use POST.", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var requestData model.RequestData
 
 	// Parse JSON request body
@@ -32,10 +39,25 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Periksa apakah email atau username sudah digunakan
+	var existingUser model.User
+	result := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser)
+	if result.RowsAffected > 0 {
+		http.Error(w, "Email or username already exists. Please use a different one.", http.StatusBadRequest)
+		return
+	} else if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		http.Error(w, "Failed to validate user data. Please try again later.", http.StatusInternalServerError)
+		return
+	}
+
 	// Cari role di tabel roles
 	var role model.Role
 	if err := config.DB.Where("name = ?", requestData.Role).First(&role).Error; err != nil {
-		http.Error(w, "Invalid role. Role must be either 'user' or 'admin'.", http.StatusBadRequest)
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "Invalid role. Role must be either 'user' or 'admin'.", http.StatusBadRequest)
+		} else {
+			http.Error(w, "Failed to validate role. Please try again later.", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -46,7 +68,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simpan ke database
+	// Simpan user ke database
 	user := model.User{
 		Email:    requestData.Email,
 		Username: requestData.Username,
@@ -59,13 +81,29 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ambil user yang baru dibuat beserta relasi role
+	var newUser model.User
+	if err := config.DB.Preload("Role").Where("id = ?", user.ID).First(&newUser).Error; err != nil {
+		http.Error(w, "Failed to retrieve user data.", http.StatusInternalServerError)
+		return
+	}
+
 	// Kirim respons sukses
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "User registered successfully",
-		"role":    role.Name,
+		"user": map[string]interface{}{
+			"email":    newUser.Email,
+			"id":       newUser.ID,
+			"username": newUser.Username,
+			"role":     newUser.Role.Name, // Pastikan `Role.Name` diambil dengan `Preload`
+		},
 	})
 }
+
+
+
+
 
 // function login user dan admin
 func Login(w http.ResponseWriter, r *http.Request) {

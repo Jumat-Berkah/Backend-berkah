@@ -4,7 +4,6 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/model"
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -178,48 +177,50 @@ func MoveExpiredTokensToBlacklist() {
 	}
 }
 
-func ScheduleTokenCleanup() {
-	s := gocron.NewScheduler(time.UTC)
-	s.Every(1).Hour().Do(MoveExpiredTokensToBlacklist) // Jalankan setiap jam
-	s.StartAsync()
+func ScheduleTokenCleanup() error {
+    scheduler := gocron.NewScheduler(time.UTC)
+
+    // Schedule the cleanup job to run every hour
+    scheduler.Every(1).Hour().Do(func() {
+        log.Println("Running token cleanup...")
+        cleanupExpiredTokens()
+    })
+
+    // Start the scheduler
+    scheduler.StartAsync()
+    return nil
 }
 
 func cleanupExpiredTokens() {
-    fmt.Println("Cleaning up expired tokens at:", time.Now())
-
-    // Ambil token yang sudah kedaluwarsa dari tabel active_tokens
     var expiredTokens []model.ActiveToken
-    if err := config.DB.Where("expires_at < ?", time.Now()).Find(&expiredTokens).Error; err != nil {
+
+    // Find expired tokens
+    err := config.DB.Where("expires_at < ?", time.Now()).Find(&expiredTokens).Error
+    if err != nil {
         log.Printf("Failed to find expired tokens: %v", err)
         return
     }
 
-    // Jika tidak ada token expired, log dan keluar
-    if len(expiredTokens) == 0 {
-        fmt.Println("No expired tokens found.")
-        return
-    }
-
-    // Pindahkan setiap token yang kedaluwarsa ke tabel blacklist_tokens
+    // Move expired tokens to blacklist and delete them from active_tokens
     for _, token := range expiredTokens {
-        // Buat entri baru di tabel blacklist_tokens
         blacklistToken := model.BlacklistToken{
             Token:     token.Token,
-            ExpiresAt: token.ExpiresAt, // Waktu kedaluwarsa asli token
+            ExpiresAt: token.ExpiresAt,
         }
 
-        // Simpan token ke blacklist_tokens
-        if err := config.DB.Create(&blacklistToken).Error; err != nil {
-            log.Printf("Failed to move token to blacklist: %v", err)
+        // Add to blacklist_tokens
+        err := config.DB.Create(&blacklistToken).Error
+        if err != nil {
+            log.Printf("Failed to add token to blacklist: %v", err)
             continue
         }
 
-        // Hapus token dari tabel active_tokens
-        if err := config.DB.Delete(&token).Error; err != nil {
+        // Remove from active_tokens
+        err = config.DB.Delete(&token).Error
+        if err != nil {
             log.Printf("Failed to delete token from active_tokens: %v", err)
         }
     }
 
-    // Log jumlah token yang berhasil diproses
-    fmt.Printf("Successfully moved %d expired tokens to blacklist.\n", len(expiredTokens))
+    log.Printf("Successfully cleaned up %d expired tokens.", len(expiredTokens))
 }
