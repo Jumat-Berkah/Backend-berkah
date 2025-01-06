@@ -14,25 +14,29 @@ import (
 )
 
 // Middleware untuk memvalidasi role pengguna
+// Middleware untuk memvalidasi role pengguna
 func RoleMiddleware(allowedRoles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Ambil token dari header Authorization
 			tokenString, err := getTokenFromHeader(r)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
+				log.Printf("Token error: %v", err)
+				http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 				return
 			}
 
 			// Verifikasi token JWT
 			claims := &model.Claims{}
 			if err := parseAndValidateToken(tokenString, claims); err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
+				log.Printf("Token validation error: %v", err)
+				http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 				return
 			}
 
 			// Validasi apakah role pengguna termasuk dalam daftar allowedRoles
 			if !isRoleAllowed(claims.Role, allowedRoles) {
+				log.Printf("Access denied: insufficient permissions for role '%s'", claims.Role)
 				http.Error(w, "Access denied: insufficient permissions", http.StatusForbidden)
 				return
 			}
@@ -42,23 +46,28 @@ func RoleMiddleware(allowedRoles ...string) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, model.RoleKey, claims.Role)
 
 			// Lanjutkan ke handler berikutnya
+			log.Printf("Access granted: userID=%d, role=%s", claims.UserID, claims.Role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
+
+
 // Fungsi untuk blacklist token
 func BlacklistToken(w http.ResponseWriter, r *http.Request) {
 	tokenString, err := getTokenFromHeader(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		log.Printf("Token error: %v", err)
+		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 
 	// Verifikasi token JWT
 	claims := &model.Claims{}
 	if err := parseAndValidateToken(tokenString, claims); err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		log.Printf("Token validation error: %v", err)
+		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -86,20 +95,23 @@ func ValidateTokenMiddleware(next http.Handler) http.Handler {
 		// Ambil token dari header
 		tokenString, err := getTokenFromHeader(r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			log.Printf("Token error: %v", err)
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
 		// Periksa apakah token ada di blacklist
 		if isTokenBlacklisted(tokenString) {
-			http.Error(w, "Token has been blacklisted", http.StatusUnauthorized)
+			log.Printf("Token is blacklisted: %v", tokenString)
+			http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)
 			return
 		}
 
 		// Verifikasi token JWT
 		claims := &model.Claims{}
 		if err := parseAndValidateToken(tokenString, claims); err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			log.Printf("Token validation error: %v", err)
+			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
 
@@ -107,15 +119,18 @@ func ValidateTokenMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), model.UserIDKey, claims.UserID)
 		ctx = context.WithValue(ctx, model.RoleKey, claims.Role)
 
+		log.Printf("Token validated successfully: userID=%d, role=%s", claims.UserID, claims.Role)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-
 
 // Helper: Ambil token dari header Authorization
 func getTokenFromHeader(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
+		return "", http.ErrNoCookie
+	}
+	if !strings.HasPrefix(authHeader, "Bearer ") {
 		return "", http.ErrNoCookie
 	}
 	return strings.TrimPrefix(authHeader, "Bearer "), nil
@@ -132,16 +147,6 @@ func parseAndValidateToken(tokenString string, claims *model.Claims) error {
 	return nil
 }
 
-// Helper: Periksa apakah role diizinkan
-func isRoleAllowed(userRole string, allowedRoles []string) bool {
-	for _, role := range allowedRoles {
-		if userRole == role {
-			return true
-		}
-	}
-	return false
-}
-
 // Helper: Periksa apakah token ada di blacklist
 func isTokenBlacklisted(tokenString string) bool {
 	var blacklistToken model.BlacklistToken
@@ -151,8 +156,8 @@ func isTokenBlacklisted(tokenString string) bool {
 	return false
 }
 
+// Memindahkan token kedaluwarsa ke tabel blacklist
 func MoveExpiredTokensToBlacklist() {
-	// Ambil token yang sudah kedaluwarsa
 	var expiredTokens []model.ActiveToken
 	if err := config.DB.Where("expires_at < ?", time.Now()).Find(&expiredTokens).Error; err != nil {
 		log.Printf("Failed to find expired tokens: %v", err)
@@ -175,52 +180,33 @@ func MoveExpiredTokensToBlacklist() {
 			log.Printf("Failed to delete token from active_tokens: %v", err)
 		}
 	}
+
+	log.Printf("Moved %d expired tokens to blacklist.", len(expiredTokens))
 }
 
+// Penjadwalan pembersihan token
 func ScheduleTokenCleanup() error {
-    scheduler := gocron.NewScheduler(time.UTC)
+	scheduler := gocron.NewScheduler(time.UTC)
 
-    // Schedule the cleanup job to run every hour
-    scheduler.Every(1).Hour().Do(func() {
-        log.Println("Running token cleanup...")
-        cleanupExpiredTokens()
-    })
+	// Jadwalkan cleanup setiap jam
+	_, err := scheduler.Every(1).Hour().Do(func() {
+		log.Println("Running token cleanup...")
+		MoveExpiredTokensToBlacklist()
+	})
+	if err != nil {
+		return err
+	}
 
-    // Start the scheduler
-    scheduler.StartAsync()
-    return nil
+	// Mulai scheduler
+	scheduler.StartAsync()
+	return nil
 }
 
-func cleanupExpiredTokens() {
-    var expiredTokens []model.ActiveToken
-
-    // Find expired tokens
-    err := config.DB.Where("expires_at < ?", time.Now()).Find(&expiredTokens).Error
-    if err != nil {
-        log.Printf("Failed to find expired tokens: %v", err)
-        return
-    }
-
-    // Move expired tokens to blacklist and delete them from active_tokens
-    for _, token := range expiredTokens {
-        blacklistToken := model.BlacklistToken{
-            Token:     token.Token,
-            ExpiresAt: token.ExpiresAt,
-        }
-
-        // Add to blacklist_tokens
-        err := config.DB.Create(&blacklistToken).Error
-        if err != nil {
-            log.Printf("Failed to add token to blacklist: %v", err)
-            continue
-        }
-
-        // Remove from active_tokens
-        err = config.DB.Delete(&token).Error
-        if err != nil {
-            log.Printf("Failed to delete token from active_tokens: %v", err)
-        }
-    }
-
-    log.Printf("Successfully cleaned up %d expired tokens.", len(expiredTokens))
+func isRoleAllowed(userRole string, allowedRoles []string) bool {
+	for _, role := range allowedRoles {
+		if userRole == role {
+			return true
+		}
+	}
+	return false
 }

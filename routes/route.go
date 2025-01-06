@@ -43,6 +43,11 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		helper.ValidateTokenMiddleware(http.HandlerFunc(controller.GetDataLocation)).ServeHTTP(w, r)
 	case method == "POST" && path == "/create/data":
 		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.CreateDataLocation))).ServeHTTP(w, r)
+	case method == "PUT" && path == "/update/data":
+		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.UpdateDataLocation))).
+		ServeHTTP(w, r)
+	case method == "DELETE" && path == "/delete/data":
+		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.DeleteDataLocation))).ServeHTTP(w, r)
 
 	// Logout route
 	case method == "POST" && path == "/logout":

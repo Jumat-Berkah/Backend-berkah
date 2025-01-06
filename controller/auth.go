@@ -4,108 +4,102 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/model"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
-// Register Handler
+
+
 func Register(w http.ResponseWriter, r *http.Request) {
-	// Periksa metode HTTP
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed. Please use POST.", http.StatusMethodNotAllowed)
-		return
-	}
+    // Periksa metode HTTP
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed. Please use POST.", http.StatusMethodNotAllowed)
+        return
+    }
 
-	var requestData model.RequestData
+    var requestData model.RequestData
 
-	// Parse JSON request body
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Invalid input. Please check your request data.", http.StatusBadRequest)
-		return
-	}
+    // Parse JSON request body
+    if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+        log.Printf("Invalid request data: %v", err)
+        http.Error(w, "Invalid input. Please check your request data.", http.StatusBadRequest)
+        return
+    }
 
-	// Validasi input
-	if requestData.Password != requestData.ConfirmPassword {
-		http.Error(w, "Passwords do not match", http.StatusBadRequest)
-		return
-	}
+    // Validasi input
+    if requestData.Password != requestData.ConfirmPassword {
+        http.Error(w, "Passwords do not match", http.StatusBadRequest)
+        return
+    }
 
-	if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" || requestData.Role == "" {
-		http.Error(w, "All fields are required", http.StatusBadRequest)
-		return
-	}
+    if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" || requestData.Role == "" {
+        http.Error(w, "All fields are required", http.StatusBadRequest)
+        return
+    }
 
-	// Periksa apakah email atau username sudah digunakan
-	var existingUser model.User
-	result := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser)
-	if result.RowsAffected > 0 {
-		http.Error(w, "Email or username already exists. Please use a different one.", http.StatusBadRequest)
-		return
-	} else if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		http.Error(w, "Failed to validate user data. Please try again later.", http.StatusInternalServerError)
-		return
-	}
+    // Periksa apakah email atau username sudah digunakan
+    var existingUser model.User
+    if err := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser).Error; err == nil {
+        log.Printf("User already exists with email: %s or username: %s", requestData.Email, requestData.Username)
+        http.Error(w, "Email or username already exists. Please use a different one.", http.StatusBadRequest)
+        return
+    }
 
-	// Cari role di tabel roles
-	var role model.Role
-	if err := config.DB.Where("name = ?", requestData.Role).First(&role).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			http.Error(w, "Invalid role. Role must be either 'user' or 'admin'.", http.StatusBadRequest)
-		} else {
-			http.Error(w, "Failed to validate role. Please try again later.", http.StatusInternalServerError)
-		}
-		return
-	}
+    // Cari role di tabel roles
+    var role model.Role
+    if err := config.DB.Where("name = ?", requestData.Role).First(&role).Error; err != nil {
+        log.Printf("Role not found: %s", requestData.Role)
+        http.Error(w, "Invalid role. Role must be either 'user' or 'admin'.", http.StatusBadRequest)
+        return
+    }
 
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-		return
-	}
+    // Hash password
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
+    if err != nil {
+        log.Printf("Failed to hash password: %v", err)
+        http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+        return
+    }
 
-	// Simpan user ke database
-	user := model.User{
-		Email:    requestData.Email,
-		Username: requestData.Username,
-		Password: string(hashedPassword),
-		RoleID:   role.ID,
-	}
+    // Simpan user ke database
+    user := model.User{
+        Email:    requestData.Email,
+        Username: requestData.Username,
+        Password: string(hashedPassword),
+        RoleID:   role.ID, // Assign RoleID dari tabel roles
+    }
 
-	if err := config.DB.Create(&user).Error; err != nil {
-		http.Error(w, "Failed to register user. Please try again later.", http.StatusInternalServerError)
-		return
-	}
+    if err := config.DB.Create(&user).Error; err != nil {
+        log.Printf("Failed to create user: %v", err)
+        http.Error(w, "Failed to register user. Please try again later.", http.StatusInternalServerError)
+        return
+    }
 
-	// Ambil user yang baru dibuat beserta relasi role
-	var newUser model.User
-	if err := config.DB.Preload("Role").Where("id = ?", user.ID).First(&newUser).Error; err != nil {
-		http.Error(w, "Failed to retrieve user data.", http.StatusInternalServerError)
-		return
-	}
+    // Fetch user lengkap dengan relasi role untuk memastikan data role tersedia
+    var savedUser model.User
+    if err := config.DB.Preload("Role").First(&savedUser, user.ID).Error; err != nil {
+        log.Printf("Failed to fetch saved user: %v", err)
+        http.Error(w, "Failed to retrieve registered user data.", http.StatusInternalServerError)
+        return
+    }
 
-	// Kirim respons sukses
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "User registered successfully",
-		"user": map[string]interface{}{
-			"email":    newUser.Email,
-			"id":       newUser.ID,
-			"username": newUser.Username,
-			"role":     newUser.Role.Name, // Pastikan `Role.Name` diambil dengan `Preload`
-		},
-	})
+    // Kirim respons sukses
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "message": "User registered successfully",
+        "user": map[string]interface{}{
+            "id":       savedUser.ID,
+            "email":    savedUser.Email,
+            "username": savedUser.Username,
+            "role":     savedUser.Role.Name, // Ambil nama role dari relasi
+        },
+    })
 }
 
-
-
-
-
-// function login user dan admin
 func Login(w http.ResponseWriter, r *http.Request) {
 	// Validasi metode HTTP
 	if r.Method != http.MethodPost {
@@ -116,20 +110,30 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	// Decode input
 	var loginInput model.LoginInput
 	if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {
+		log.Printf("Invalid request payload: %v", err)
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	// Cari pengguna berdasarkan email
 	var user model.User
-	if err := config.DB.Where("email = ?", loginInput.Email).First(&user).Error; err != nil {
+	if err := config.DB.Preload("Role").Where("email = ?", loginInput.Email).First(&user).Error; err != nil {
+		log.Printf("User not found with email: %s", loginInput.Email)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
 	// Periksa password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password)); err != nil {
+		log.Printf("Invalid password for email: %s", loginInput.Email)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Periksa apakah role valid
+	if user.Role.Name == "" {
+		log.Printf("Role not found for user ID: %d", user.ID)
+		http.Error(w, "User role not found. Please contact support.", http.StatusUnauthorized)
 		return
 	}
 
@@ -146,6 +150,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(config.JwtKey))
 	if err != nil {
+		log.Printf("Failed to generate token for user ID: %d, error: %v", user.ID, err)
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
@@ -157,6 +162,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: expirationTime,
 	}
 	if err := config.DB.Create(&activeToken).Error; err != nil {
+		log.Printf("Failed to save active token for user ID: %d, error: %v", user.ID, err)
 		http.Error(w, "Failed to save active token", http.StatusInternalServerError)
 		return
 	}
@@ -173,8 +179,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		"token": tokenString,
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+
+	log.Printf("User logged in successfully: ID=%d, email=%s, role=%s", user.ID, user.Email, user.Role.Name)
 }
+
 
 
 
