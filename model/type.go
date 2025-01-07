@@ -62,7 +62,6 @@ type RequestData struct {
 	Username        string `json:"username"`
 	Password        string `json:"password"`
 	ConfirmPassword string `json:"confirm_password"`
-	Role            string `json:"role"`
 }
 
 type Claims struct {

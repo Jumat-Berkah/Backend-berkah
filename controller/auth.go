@@ -36,7 +36,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" || requestData.Role == "" {
+    if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" {
         http.Error(w, "All fields are required", http.StatusBadRequest)
         return
     }
@@ -46,14 +46,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
     if err := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser).Error; err == nil {
         log.Printf("User already exists with email: %s or username: %s", requestData.Email, requestData.Username)
         http.Error(w, "Email or username already exists. Please use a different one.", http.StatusBadRequest)
-        return
-    }
-
-    // Cari role di tabel roles
-    var role model.Role
-    if err := config.DB.Where("name = ?", requestData.Role).First(&role).Error; err != nil {
-        log.Printf("Role not found: %s", requestData.Role)
-        http.Error(w, "Invalid role. Role must be either 'user' or 'admin'.", http.StatusBadRequest)
         return
     }
 
@@ -70,7 +62,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
         Email:    requestData.Email,
         Username: requestData.Username,
         Password: string(hashedPassword),
-        RoleID:   role.ID, // Assign RoleID dari tabel roles
     }
 
     if err := config.DB.Create(&user).Error; err != nil {
@@ -79,9 +70,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Fetch user lengkap dengan relasi role untuk memastikan data role tersedia
+    // Fetch user yang baru saja disimpan
     var savedUser model.User
-    if err := config.DB.Preload("Role").First(&savedUser, user.ID).Error; err != nil {
+    if err := config.DB.First(&savedUser, user.ID).Error; err != nil {
         log.Printf("Failed to fetch saved user: %v", err)
         http.Error(w, "Failed to retrieve registered user data.", http.StatusInternalServerError)
         return
@@ -95,10 +86,10 @@ func Register(w http.ResponseWriter, r *http.Request) {
             "id":       savedUser.ID,
             "email":    savedUser.Email,
             "username": savedUser.Username,
-            "role":     savedUser.Role.Name, // Ambil nama role dari relasi
         },
     })
 }
+
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	// Validasi metode HTTP
