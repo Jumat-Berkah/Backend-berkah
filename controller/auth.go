@@ -14,9 +14,13 @@ import (
 
 // register account user
 func Register(w http.ResponseWriter, r *http.Request) {
-    // Periksa metode HTTP
+    // Pastikan metode HTTP adalah POST
     if r.Method != http.MethodPost {
-        http.Error(w, "Method not allowed. Please use POST.", http.StatusMethodNotAllowed)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusMethodNotAllowed)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "Method not allowed. Please use POST.",
+        })
         return
     }
 
@@ -25,18 +29,30 @@ func Register(w http.ResponseWriter, r *http.Request) {
     // Parse JSON request body
     if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
         log.Printf("Invalid request data: %v", err)
-        http.Error(w, "Invalid input. Please check your request data.", http.StatusBadRequest)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "Invalid input. Please check your request data.",
+        })
         return
     }
 
     // Validasi input
     if requestData.Password != requestData.ConfirmPassword {
-        http.Error(w, "Passwords do not match", http.StatusBadRequest)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "Passwords do not match.",
+        })
         return
     }
 
     if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" {
-        http.Error(w, "All fields are required", http.StatusBadRequest)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "All fields are required.",
+        })
         return
     }
 
@@ -44,7 +60,11 @@ func Register(w http.ResponseWriter, r *http.Request) {
     var existingUser model.User
     if err := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser).Error; err == nil {
         log.Printf("User already exists with email: %s or username: %s", requestData.Email, requestData.Username)
-        http.Error(w, "Email or username already exists. Please use a different one.", http.StatusBadRequest)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "Email or username already exists. Please use a different one.",
+        })
         return
     }
 
@@ -52,7 +72,11 @@ func Register(w http.ResponseWriter, r *http.Request) {
     hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
     if err != nil {
         log.Printf("Failed to hash password: %v", err)
-        http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "Failed to hash password.",
+        })
         return
     }
 
@@ -66,11 +90,16 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
     if err := config.DB.Create(&user).Error; err != nil {
         log.Printf("Failed to create user: %v", err)
-        http.Error(w, "Failed to register user. Please try again later.", http.StatusInternalServerError)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(map[string]string{
+            "message": "Failed to register user. Please try again later.",
+        })
         return
     }
 
     // Kirim respons sukses
+    w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusCreated)
     json.NewEncoder(w).Encode(map[string]interface{}{
         "message": "User registered successfully",
@@ -81,6 +110,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
         },
     })
 }
+
 
 // login admin dan user
 func Login(w http.ResponseWriter, r *http.Request) {
