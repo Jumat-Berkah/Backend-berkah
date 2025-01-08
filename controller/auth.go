@@ -12,8 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-
-
+// register account user
 func Register(w http.ResponseWriter, r *http.Request) {
     // Periksa metode HTTP
     if r.Method != http.MethodPost {
@@ -57,11 +56,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Simpan user ke database
+    // Simpan user ke database dengan default role_id = 2
     user := model.User{
         Email:    requestData.Email,
         Username: requestData.Username,
         Password: string(hashedPassword),
+        RoleID:   2, // Default role untuk user biasa
     }
 
     if err := config.DB.Create(&user).Error; err != nil {
@@ -70,27 +70,19 @@ func Register(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Fetch user yang baru saja disimpan
-    var savedUser model.User
-    if err := config.DB.First(&savedUser, user.ID).Error; err != nil {
-        log.Printf("Failed to fetch saved user: %v", err)
-        http.Error(w, "Failed to retrieve registered user data.", http.StatusInternalServerError)
-        return
-    }
-
     // Kirim respons sukses
     w.WriteHeader(http.StatusCreated)
     json.NewEncoder(w).Encode(map[string]interface{}{
         "message": "User registered successfully",
         "user": map[string]interface{}{
-            "id":       savedUser.ID,
-            "email":    savedUser.Email,
-            "username": savedUser.Username,
+            "id":       user.ID,
+            "email":    user.Email,
+            "username": user.Username,
         },
     })
 }
 
-
+// login admin dan user
 func Login(w http.ResponseWriter, r *http.Request) {
 	// Validasi metode HTTP
 	if r.Method != http.MethodPost {
@@ -176,9 +168,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	log.Printf("User logged in successfully: ID=%d, email=%s, role=%s", user.ID, user.Email, user.Role.Name)
 }
 
-
-
-
+// logout
 func Logout(w http.ResponseWriter, r *http.Request) {
     // Ambil token dari header Authorization
     token := r.Header.Get("Authorization")
