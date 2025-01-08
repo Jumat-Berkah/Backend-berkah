@@ -77,7 +77,13 @@ func GetDataLocation(w http.ResponseWriter, r *http.Request) {
     // Jika tidak ada data yang ditemukan
     if len(locations) == 0 {
         log.Println("No locations found in the database")
-        http.Error(w, "No locations found", http.StatusNotFound)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        json.NewEncoder(w).Encode(map[string]interface{}{
+            "status":  "success",
+            "message": "No locations found",
+            "data":    []model.Location{},
+        })
         return
     }
 
@@ -91,6 +97,7 @@ func GetDataLocation(w http.ResponseWriter, r *http.Request) {
         "data":    locations,
     })
 }
+
 
 func CreateDataLocation(w http.ResponseWriter, r *http.Request) {
 	log.Println("CreateDataLocation called")
