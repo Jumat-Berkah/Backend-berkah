@@ -5,3 +5,10 @@ services:
     plan: free
     buildCommand: go build -o main .
     startCommand: ./main
+    envVars:
+      - key: PORT
+        value: "8080" # Ganti dengan port yang sesuai jika diperlukan
+    healthCheckPath: /health # Ganti dengan path yang sesuai untuk health check
+    healthCheckInterval: 10s
+    healthCheckTimeout: 5s
+    healthCheckRetries: 3
