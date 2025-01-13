@@ -49,6 +49,16 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "DELETE" && path == "/delete/data":
 		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.DeleteDataLocation))).ServeHTTP(w, r)
 
+	// crud for user
+	case method == "GET" && path == "/datalokasi/user":
+		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.GetFeedback))).
+		ServeHTTP(w, r)
+	case method == "POST" && path == "/create/feedback":
+		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.CreateFeedback))).
+		ServeHTTP(w, r)
+	case method == "PUT" && path == "/delete/feedback":
+		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.DeleteFeedback))).
+		ServeHTTP(w, r)
 	// Logout route
 	case method == "POST" && path == "/logout":
 		helper.ValidateTokenMiddleware(http.HandlerFunc(helper.BlacklistToken)).ServeHTTP(w, r)
