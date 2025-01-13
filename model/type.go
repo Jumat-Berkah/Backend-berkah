@@ -76,12 +76,11 @@ const (
 	UserIDKey ContextKey = "userID"
 	RoleKey   ContextKey = "role"
 )
-
-type Feedback struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`                      // Primary key untuk feedback
-	LocationID uint      `gorm:"not null" json:"location_id"`               // Relasi ke tabel location
-	UserID     uint      `gorm:"not null" json:"user_id"`                   // User ID dari pemberi feedback
-	Rating     int       `gorm:"type:int;not null" json:"rating"`           // Rating untuk masjid (1-5)
-	Comment    string    `gorm:"type:text" json:"comment"`                  // Komentar feedback
-	CreatedAt  time.Time `json:"created_at"`                                // Tanggal dibuat
-}
+type Feedback struct {  
+    ID       uint   `json:"id" gorm:"primaryKey"`  
+    LocationID uint   `json:"location_id"` // ID of the mosque being rated  
+    UserID   uint   `json:"user_id"`   // ID of the user providing the feedback  
+    Rating   int    `json:"rating"`     // Rating value (e.g., 1 to 5)  
+    Comment  string `json:"comment"`    // Optional comment
+	CreatedAt  time.Time `json:"created_at"`  
+}  

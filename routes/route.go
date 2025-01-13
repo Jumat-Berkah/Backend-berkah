@@ -51,12 +51,15 @@ func URL(w http.ResponseWriter, r *http.Request) {
 
 	// crud for user
 	case method == "GET" && path == "/datalokasi/user":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.GetFeedback))).
+		helper.ValidateTokenMiddleware(http.HandlerFunc(controller.GetDataFeedback)).
 		ServeHTTP(w, r)
 	case method == "POST" && path == "/create/feedback":
 		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.CreateFeedback))).
 		ServeHTTP(w, r)
-	case method == "PUT" && path == "/delete/feedback":
+	case method == "PUT" && path == "/update/feedback":
+		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.UpdateFeedback))).
+		ServeHTTP(w, r)
+	case method == "DELETE" && path == "/delete/feedback":
 		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.DeleteFeedback))).
 		ServeHTTP(w, r)
 	// Logout route
