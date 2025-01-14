@@ -12,104 +12,104 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// register account user
-func Register(w http.ResponseWriter, r *http.Request) {
-    // Pastikan metode HTTP adalah POST
-    if r.Method != http.MethodPost {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusMethodNotAllowed)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "Method not allowed. Please use POST.",
-        })
-        return
-    }
-
-    var requestData model.RequestData
-
-    // Parse JSON request body
-    if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-        log.Printf("Invalid request data: %v", err)
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "Invalid input. Please check your request data.",
-        })
-        return
-    }
-
-    // Validasi input
-    if requestData.Password != requestData.ConfirmPassword {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "Passwords do not match.",
-        })
-        return
-    }
-
-    if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "All fields are required.",
-        })
-        return
-    }
-
-    // Periksa apakah email atau username sudah digunakan
-    var existingUser model.User
-    if err := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser).Error; err == nil {
-        log.Printf("User already exists with email: %s or username: %s", requestData.Email, requestData.Username)
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "Email or username already exists. Please use a different one.",
-        })
-        return
-    }
-
-    // Hash password
-    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)
-    if err != nil {
-        log.Printf("Failed to hash password: %v", err)
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "Failed to hash password.",
-        })
-        return
-    }
-
-    // Simpan user ke database dengan default role_id = 2
-    user := model.User{
-        Email:    requestData.Email,
-        Username: requestData.Username,
-        Password: string(hashedPassword),
-        RoleID:   2, // Default role untuk user biasa
-    }
-
-    if err := config.DB.Create(&user).Error; err != nil {
-        log.Printf("Failed to create user: %v", err)
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusInternalServerError)
-        json.NewEncoder(w).Encode(map[string]string{
-            "message": "Failed to register user. Please try again later.",
-        })
-        return
-    }
-
-    // Kirim respons sukses
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "message": "User registered successfully",
-        "user": map[string]interface{}{
-            "id":       user.ID,
-            "email":    user.Email,
-            "username": user.Username,
-        },
-    })
-}
+// Register handles user registration
+func Register(w http.ResponseWriter, r *http.Request) {  
+    // Ensure the HTTP method is POST  
+    if r.Method != http.MethodPost {  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusMethodNotAllowed)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "Method not allowed. Please use POST.",  
+        })  
+        return  
+    }  
+  
+    var requestData model.RequestData  
+  
+    // Parse JSON request body  
+    if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {  
+        log.Printf("Invalid request data: %v", err)  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusBadRequest)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "Invalid input. Please check your request data.",  
+        })  
+        return  
+    }  
+  
+    // Validate input  
+    if requestData.Password != requestData.ConfirmPassword {  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusBadRequest)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "Passwords do not match.",  
+        })  
+        return  
+    }  
+  
+    if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" {  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusBadRequest)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "All fields are required.",  
+        })  
+        return  
+    }  
+  
+    // Check if email or username already exists  
+    var existingUser model.User  
+    if err := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser).Error; err == nil {  
+        log.Printf("User already exists with email: %s or username: %s", requestData.Email, requestData.Username)  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusBadRequest)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "Email or username already exists. Please use a different one.",  
+        })  
+        return  
+    }  
+  
+    // Hash password  
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)  
+    if err != nil {  
+        log.Printf("Failed to hash password: %v", err)  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusInternalServerError)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "Failed to hash password.",  
+        })  
+        return  
+    }  
+  
+    // Save user to database with default role_id = 2  
+    user := model.User{  
+        Email:    requestData.Email,  
+        Username: requestData.Username,  
+        Password: string(hashedPassword),  
+        RoleID:   2, // Default role for regular users  
+    }  
+  
+    if err := config.DB.Create(&user).Error; err != nil {  
+        log.Printf("Failed to create user: %v", err)  
+        w.Header().Set("Content-Type", "application/json")  
+        w.WriteHeader(http.StatusInternalServerError)  
+        json.NewEncoder(w).Encode(map[string]string{  
+            "message": "Failed to register user. Please try again later.",  
+        })  
+        return  
+    }  
+  
+    // Send success response  
+    w.Header().Set("Content-Type", "application/json")  
+    w.WriteHeader(http.StatusCreated)  
+    json.NewEncoder(w).Encode(map[string]interface{}{  
+        "message": "User registered successfully",  
+        "user": map[string]interface{}{  
+            "id":       user.ID,  
+            "email":    user.Email,  
+            "username": user.Username,  
+        },  
+    })  
+}  
 
 
 // login admin dan user
