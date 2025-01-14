@@ -76,13 +76,31 @@ const (
 	UserIDKey ContextKey = "userID"
 	RoleKey   ContextKey = "role"
 )
+
 type Feedback struct {  
-    ID         uint      `json:"id" gorm:"primaryKey"` // Primary key for the feedback   
-    UserID     uint      `json:"user_id"`              // ID of the user providing the feedback  
-    Rating     int       `json:"rating"`               // Rating value (e.g., 1 to 5)
-	Name        string    `json:"name"`                 // Name of the location  
-    Address     string    `json:"address"`              // Address of the location  
-    Description string    `json:"description"`          // Description of the location  
-    Comment    string    `json:"comment,omitempty"`    // Optional comment  
-    CreatedAt  time.Time `json:"created_at"`           // Timestamp of feedback creation  
+	ID          uint      `json:"id" gorm:"primaryKey"`  
+	UserID      uint      `json:"user_id"`  
+	Rating      int       `json:"rating"`  
+	Name        string    `json:"name"`  
+	Address     string    `json:"address"`  
+	Description *string    `json:"description,omitempty"`  
+	Comment     *string    `json:"comment,omitempty"`  
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`  
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`  
+}  
+
+type DataFeedback struct {  
+	Name        string  `json:"name"`  
+	Address     string  `json:"address"`  
+	Description *string `json:"description,omitempty"`  
+	Rating      int     `json:"rating"`  
+	Comment     *string `json:"comment,omitempty"`  
+} 
+
+type Inputuserupdate struct {  
+	Name        string  `json:"name"`  
+	Address     string  `json:"address"`  
+	Description *string `json:"description,omitempty"`  
+	Rating      int     `json:"rating"`  
+	Comment     *string `json:"comment,omitempty"`  
 }  
