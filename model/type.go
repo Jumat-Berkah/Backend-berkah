@@ -77,10 +77,10 @@ const (
 	RoleKey   ContextKey = "role"
 )
 type Feedback struct {  
-    ID       uint   `json:"id" gorm:"primaryKey"`  
-    LocationID uint   `json:"location_id"` // ID of the mosque being rated  
-    UserID   uint   `json:"user_id"`   // ID of the user providing the feedback  
-    Rating   int    `json:"rating"`     // Rating value (e.g., 1 to 5)  
-    Comment  string `json:"comment"`    // Optional comment
-	CreatedAt  time.Time `json:"created_at"`  
+    ID         uint      `json:"id" gorm:"primaryKey"` // Primary key for the feedback  
+    LocationID uint      `json:"location_id"`          // ID of the mosque being rated  
+    UserID     uint      `json:"user_id"`              // ID of the user providing the feedback  
+    Rating     int       `json:"rating"`               // Rating value (e.g., 1 to 5)  
+    Comment    string    `json:"comment,omitempty"`    // Optional comment  
+    CreatedAt  time.Time `json:"created_at"`           // Timestamp of feedback creation  
 }  
