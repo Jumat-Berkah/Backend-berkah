@@ -7,6 +7,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var UserIDKey = "userID"  
+
+var RoleKey = "role" 
+
 // JwtKey will hold the JWT secret key
 var JwtKey []byte
 

@@ -34,38 +34,13 @@ func URL(w http.ResponseWriter, r *http.Request) {
 		controller.Login(w, r)
 	case method == "POST" && path == "/logout":
 		controller.Logout(w, r)
-	case method == "GET" && path == "/healthcheck":
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Service is running"))
 
-	// CRUD routes (with JWT Middleware)
-	case method == "GET" && path == "/datalokasi":
-		helper.ValidateTokenMiddleware(http.HandlerFunc(controller.GetDataLocation)).ServeHTTP(w, r)
-	case method == "POST" && path == "/create/data":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.CreateDataLocation))).ServeHTTP(w, r)
-	case method == "PUT" && path == "/update/data":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.UpdateDataLocation))).
-		ServeHTTP(w, r)
-	case method == "DELETE" && path == "/delete/data":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("admin")(http.HandlerFunc(controller.DeleteDataLocation))).ServeHTTP(w, r)
-
-	// crud for user
-	case method == "GET" && path == "/datalokasi/user":
-		helper.ValidateTokenMiddleware(http.HandlerFunc(controller.GetDataFeedback)).
-		ServeHTTP(w, r)
-	case method == "POST" && path == "/create/feedback":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.CreateFeedback))).
-		ServeHTTP(w, r)
-	case method == "PUT" && path == "/update/feedback":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.UpdateFeedback))).
-		ServeHTTP(w, r)
-	case method == "DELETE" && path == "/delete/feedback":
-		helper.ValidateTokenMiddleware(helper.RoleMiddleware("user")(http.HandlerFunc(controller.DeleteFeedback))).
-		ServeHTTP(w, r)
-	// Logout route
-	case method == "POST" && path == "/logout":
-		helper.ValidateTokenMiddleware(http.HandlerFunc(helper.BlacklistToken)).ServeHTTP(w, r)
-
+	case method == "GET" && path == "/getlocation":
+		controller.GetLocation(w, r)
+	case method == "POST" && path == "/createlocation":
+		controller.CreateLocation(w, r)
+	case method == "PUT" && path == "/updatelocation":
+		controller.UpdateLocation(w, r)	
 	// Default route
 	default:
 		helper.NotFound(w, r)

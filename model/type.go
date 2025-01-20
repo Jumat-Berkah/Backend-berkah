@@ -6,101 +6,73 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-type Location struct {
-	ID          uint   `gorm:"primaryKey" json:"id"`
-	Name        string `gorm:"type:varchar(100);not null" json:"name"`
-	Address     string `gorm:"type:text;not null" json:"address"`
-	Description string `gorm:"type:text" json:"description"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-type ActiveToken struct {
-	ID        uint      `gorm:"primaryKey"`               // ID unik untuk setiap token
-	UserID    uint      `gorm:"not null"`                // ID user yang memiliki token ini (relasi ke tabel User)
-	Token     string    `gorm:"unique;not null"`         // Token JWT
-	ExpiresAt time.Time `gorm:"not null"`                // Waktu kedaluwarsa token
-	CreatedAt time.Time `gorm:"autoCreateTime"`          // Waktu token dibuat
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`          // Waktu token terakhir diperbarui
-}
-
-type BlacklistToken struct {
-    ID        uint      `gorm:"primaryKey"`
-    Token     string    `gorm:"unique;not null"`
-    ExpiresAt time.Time `gorm:"not null"`
-    CreatedAt time.Time
-}
-type Token struct {
-	ID        uint      `gorm:"primaryKey"`
-	UserID    uint      `gorm:"not null"` // Relasi ke User
-	User      User      `gorm:"foreignKey:UserID"`
-	Token     string    `gorm:"unique;not null"`
-	Role      string    `gorm:"not null"`
-	CreatedAt time.Time
-	ExpiresAt time.Time // Token Expiry Time
-}
-type UpdateInput struct {
-	Name        string `json:"name"`
-	Address     string `json:"address"`
-	Description string `json:"description"`
-}
-
-type Input struct {
-	ID 			uint   `json:"id"`
-	Name        string `json:"name"`
-	Address     string `json:"address"`
-	Description string `json:"description"`
-}
-type LoginInput struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	Role      string `json:"role"`
-}
-
-type RequestData struct {
-	Email           string `json:"email"`
-	Username        string `json:"username"`
-	Password        string `json:"password"`
-	ConfirmPassword string `json:"confirm_password"`
-}
-
-type Claims struct {
-	UserID uint   `json:"user_id"`
-	Role   string `json:"role"`
-	jwt.RegisteredClaims
-}
-
-type ContextKey string
-
-const (
-	UserIDKey ContextKey = "userID"
-	RoleKey   ContextKey = "role"
-)
-
-type Feedback struct {  
-	ID          uint      `json:"id" gorm:"primaryKey"`  
-	UserID      uint      `json:"user_id"`  
-	Rating      int       `json:"rating"`  
-	Name        string    `json:"name"`  
-	Address     string    `json:"address"`  
-	Description *string    `json:"description,omitempty"`  
-	Comment     *string    `json:"comment,omitempty"`  
-	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`  
-	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`  
+// Location model
+type Location struct {  
+	ID          uint      `gorm:"primaryKey" json:"id"`  
+	Name        string    `gorm:"type:varchar(100);not null" json:"name"`  
+	Address     string    `gorm:"type:text;not null" json:"address"`  
+	Description string    `gorm:"type:text" json:"description"`  
+	CreatedAt   time.Time `gorm:"autoCreateTime"`      // Waktu dibuat  
+}  
+  
+// ActiveToken model  
+type ActiveToken struct {  
+	ID        uint      `gorm:"primaryKey"`               // ID unik untuk setiap token  
+	UserID    uint      `gorm:"not null"`                // ID user yang memiliki token ini (relasi ke tabel User)  
+	Token     string    `gorm:"unique;not null"`         // Token JWT  
+	ExpiresAt time.Time `gorm:"not null"`                // Waktu kedaluwarsa token  
+	CreatedAt time.Time `gorm:"autoCreateTime"`          // Waktu token dibuat  
+}  
+  
+// BlacklistToken model  
+type BlacklistToken struct {  
+	ID        uint      `gorm:"primaryKey"`  
+	Token     string    `gorm:"unique;not null"`  
+	ExpiresAt time.Time `gorm:"not null"`  
+	CreatedAt time.Time `gorm:"autoCreateTime"` // Waktu dibuat  
+}  
+  
+// Token model  
+type Token struct {  
+	ID        uint      `gorm:"primaryKey"`  
+	UserID    uint      `gorm:"not null"` // Relasi ke User  
+	User      User      `gorm:"foreignKey:UserID"`  
+	Token     string    `gorm:"unique;not null"`  
+	Role      string    `gorm:"not null"`  
+	CreatedAt time.Time `gorm:"autoCreateTime"` // Waktu dibuat  
+	ExpiresAt time.Time `gorm:"not null"`       // Token Expiry Time  
 }  
 
-type DataFeedback struct {  
-	Name        string  `json:"name"`  
-	Address     string  `json:"address"`  
-	Description *string `json:"description,omitempty"`  
-	Rating      int     `json:"rating"`  
-	Comment     *string `json:"comment,omitempty"`  
+// Feedback model  
+type Feedback struct {  
+	ID          uint      `json:"id" gorm:"primaryKey"`    
+	UserID      uint      `json:"user_id"`    
+	Rating      int       `json:"rating"`    
+	Name        string    `json:"name"`    
+	Address     string    `json:"address"`    
+	Description *string    `json:"description,omitempty"`    
+	Comment     *string    `json:"comment,omitempty"`    
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"` // Waktu dibuat  
+}
+
+type Claims struct {  
+	UserID    uint      `json:"user_id"`    // ID pengguna  
+	Role      string    `json:"role"`       // Nama role pengguna  
+	ExpiresAt time.Time  `json:"expires_at"` // Waktu kedaluwarsa token  
+	jwt.RegisteredClaims // Menyimpan klaim terdaftar seperti Issuer, Subject, Audience, dan ExpiresAt  
 } 
 
-type Inputuserupdate struct {  
-	Name        string  `json:"name"`  
-	Address     string  `json:"address"`  
-	Description *string `json:"description,omitempty"`  
-	Rating      int     `json:"rating"`  
-	Comment     *string `json:"comment,omitempty"`  
+// RequestData model untuk registrasi  
+type RequestData struct {  
+	Email            string `json:"email"`  
+	Username         string `json:"username"`  
+	Password         string `json:"password"`  
+	ConfirmPassword  string `json:"confirm_password"`  
 }  
+  
+// LoginInput model untuk login  
+type LoginInput struct {  
+	Email    string `json:"email"`  
+	Password string `json:"password"`  
+}  
+  
