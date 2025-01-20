@@ -40,7 +40,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "POST" && path == "/createlocation":
 		controller.CreateLocation(w, r)
 	case method == "PUT" && path == "/updatelocation":
-		controller.UpdateLocation(w, r)	
+		controller.UpdateLocation(w, r)
+	case method == "DELETE" && path == "/deletelocation":
+		controller.DeleteLocation(w, r)	
 	// Default route
 	default:
 		helper.NotFound(w, r)
