@@ -1,43 +1,49 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )  
   
 var DB *gorm.DB  
   
-// ConnectDatabase menghubungkan aplikasi ke database PostgreSQL  
+// ConnectDatabase connects the application to the PostgreSQL database  
 func ConnectDatabase() {  
-	// Ambil variabel dari .env  
-	dbUser := os.Getenv("POSTGRESUSER")  
-	dbPassword := os.Getenv("POSTGRESPASSWORD")  
-	dbHost := os.Getenv("POSTGRESHOST")  
-	dbPort := os.Getenv("POSTGRESPORT")  
-	dbName := os.Getenv("POSTGRESDATABASE")  
+	// Get the DATABASE_URL from .env  
+	dbURL := os.Getenv("DATABASE_URL")  
   
-	// Validasi variabel environment  
-	if dbUser == "" || dbPassword == "" || dbHost == "" || dbPort == "" || dbName == "" {  
-		log.Fatal("Database configuration is missing in .env file")  
+	// Validate the DATABASE_URL environment variable  
+	if dbURL == "" {  
+		log.Fatal("DATABASE_URL is missing in .env file")  
 	}  
   
-	// Buat DSN untuk PostgreSQL  
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",  
-		dbHost, dbPort, dbUser, dbPassword, dbName)  
+	log.Printf("Connecting to database with DATABASE_URL: %s", dbURL)  
   
-	log.Printf("Connecting to database with DSN: %s", dsn)  
+	// Set GORM logger to log SQL statements  
+	gormLogger := logger.New(  
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // Output to stdout  
+		logger.Config{  
+			SlowThreshold:             200 * time.Millisecond, // Log slow SQL queries  
+			LogLevel:                 logger.Info,             // Log level  
+			IgnoreRecordNotFoundError: true,                   // Ignore ErrRecordNotFound  
+			Colorful:                 true,                    // Enable colorful logging  
+		},  
+	)  
   
-	// Koneksi ke PostgreSQL  
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})  
+	// Connect to PostgreSQL using the DATABASE_URL  
+	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{  
+		Logger: gormLogger,  
+	})  
 	if err != nil {  
 		log.Fatalf("Failed to connect to database: %v", err)  
 	}  
   
-	// Simpan koneksi ke variabel global DB  
+	// Save the connection to the global DB variable  
 	DB = db  
 	log.Println("Connected to the database successfully!")  
 }  
