@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -172,51 +171,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
         },  
     })  
 }  
-  
-// Logout handles user logout  
-func Logout(w http.ResponseWriter, r *http.Request) {  
-	// Ambil token dari header Authorization  
-	tokenString, err := helper.GetTokenFromHeader(r)
-	if err != nil {
-		log.Printf("Token error: %v", err)  
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Periksa apakah token ada di blacklist  
-	if helper.IsTokenBlacklisted(tokenString) {  
-		log.Printf("Token is already blacklisted: %v", tokenString)  
-		http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Simpan token ke tabel blacklist_tokens  
-	blacklistToken := model.BlacklistToken{  
-		Token:     tokenString,  
-		ExpiresAt: time.Now().Add(24 * time.Hour), // Token kedaluwarsa dalam 24 jam  
-	}  
-	if err := config.DB.Create(&blacklistToken).Error; err != nil {  
-		log.Printf("Failed to blacklist token: %v", err)  
-		http.Error(w, "Failed to blacklist token", http.StatusInternalServerError)  
-		return  
-	}  
-  
-	// Hapus token dari tabel active_tokens  
-	if err := config.DB.Where("token = ?", tokenString).Delete(&model.ActiveToken{}).Error; err != nil {  
-		log.Printf("Failed to delete token from active_tokens: %v", err)  
-		http.Error(w, "Failed to delete active token", http.StatusInternalServerError)  
-		return  
-	}  
-  
-	w.Header().Set("Content-Type", "application/json")  
-	json.NewEncoder(w).Encode(map[string]interface{}{  
-		"status":  "success",  
-		"message": "Logout successful, token blacklisted",  
-	})  
-  
-	log.Printf("User logged out successfully: token=%s", tokenString)  
-}  
-
 
 
 
