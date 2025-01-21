@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -114,101 +113,64 @@ func Register(w http.ResponseWriter, r *http.Request) {
         },        
     })        
 }  
-
-
-
   
 // Login handles user login  
 func Login(w http.ResponseWriter, r *http.Request) {  
-	// Validasi metode HTTP  
-	if r.Method != http.MethodPost {  
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)  
-		return  
-	}  
+    // Validasi metode HTTP  
+    if r.Method != http.MethodPost {  
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)  
+        return  
+    }  
   
-	// Decode input  
-	var loginInput model.LoginInput  
-	if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {  
-		log.Printf("Invalid request payload: %v", err)  
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)  
-		return  
-	}  
+    // Decode input  
+    var loginInput model.LoginInput  
+    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {  
+        log.Printf("Invalid request payload: %v", err)  
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)  
+        return  
+    }  
   
-	// Validasi input  
-	if loginInput.Email == "" || loginInput.Password == "" {  
-		http.Error(w, "Email and password are required", http.StatusBadRequest)  
-		return  
-	}  
+    // Validasi input  
+    if loginInput.Email == "" || loginInput.Password == "" {  
+        http.Error(w, "Email and password are required", http.StatusBadRequest)  
+        return  
+    }  
   
-	// Cari pengguna berdasarkan email  
-	var user model.User  
-	if err := config.DB.Preload("Role").Where("email = ?", loginInput.Email).First(&user).Error; err != nil {  
-		log.Printf("User not found with email: %s", loginInput.Email)  
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)  
-		return  
-	}  
+    // Cari pengguna berdasarkan email  
+    var user model.User  
+    if err := config.DB.Where("email = ?", loginInput.Email).First(&user).Error; err != nil {  
+        log.Printf("User not found: %v", err)  
+        http.Error(w, "Invalid email or password", http.StatusUnauthorized)  
+        return  
+    }  
   
-	// Periksa password  
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password)); err != nil {  
-		log.Printf("Invalid password for email: %s", loginInput.Email)  
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)  
-		return  
-	}  
+    // Verifikasi password  
+    if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password)); err != nil {  
+        log.Printf("Invalid password: %v", err)  
+        http.Error(w, "Invalid email or password", http.StatusUnauthorized)  
+        return  
+    }  
   
-	// Periksa apakah role valid  
-	if user.Role.ID == 0 {  
-		log.Printf("Role not found for user ID: %d", user.ID)  
-		http.Error(w, "User role not found. Please contact support.", http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Buat token JWT  
-	expirationTime := time.Now().Add(24 * time.Hour)  
-	claims := model.Claims{  
-		UserID: user.ID,  
-		Role:   user.Role.Name,  
-		RegisteredClaims: jwt.RegisteredClaims{  
-			ExpiresAt: jwt.NewNumericDate(expirationTime),  
-			IssuedAt:  jwt.NewNumericDate(time.Now()),  
-		},  
-	}  
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)  
-	tokenString, err := token.SignedString([]byte(config.JwtKey))  
+    token, err := helper.GenerateToken(user.ID, user.Role.Name)  
 	if err != nil {  
-		log.Printf("Failed to generate token for user ID: %d, error: %v", user.ID, err)  
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)  
-		return  
-	}  
+    log.Printf("Failed to generate token for user ID: %d, error: %v", user.ID, err)  
+    http.Error(w, "Failed to generate token", http.StatusInternalServerError)  
+    return  
+}  
+
   
-	// Simpan token ke tabel active_tokens  
-	activeToken := model.ActiveToken{  
-		UserID:    user.ID,  
-		Token:     tokenString,  
-		ExpiresAt: expirationTime,  
-	}  
-	if err := config.DB.Create(&activeToken).Error; err != nil {  
-		log.Printf("Failed to save active token for user ID: %d, error: %v", user.ID, err)  
-		http.Error(w, "Failed to save active token", http.StatusInternalServerError)  
-		return  
-	}  
-  
-	// Kirim respons  
-	response := map[string]interface{}{  
-		"message": "Login successful",  
-		"user": map[string]interface{}{  
-			"id":       user.ID,  
-			"email":    user.Email,  
-			"username": user.Username,  
-			"role":     user.Role.Name,  
-			"role_id":  user.Role.ID, // Menambahkan role_id ke respons  
-		},  
-		"token": tokenString,  
-	}  
-	w.Header().Set("Content-Type", "application/json")  
-	w.WriteHeader(http.StatusOK)  
-	json.NewEncoder(w).Encode(response)  
-  
-	log.Printf("User logged in successfully: ID=%d, email=%s, role=%s", user.ID, user.Email, user.Role.Name)  
+    // Kirim respons sukses dengan token  
+    w.Header().Set("Content-Type", "application/json")  
+    w.WriteHeader(http.StatusOK)  
+    json.NewEncoder(w).Encode(map[string]interface{}{  
+        "message": "Login successful",  
+        "token":   token,  
+        "user": map[string]interface{}{  
+            "id":    user.ID,  
+            "email": user.Email,  
+            "role":  user.RoleID,  
+        },  
+    })  
 }  
   
 // Logout handles user logout  

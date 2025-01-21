@@ -231,3 +231,24 @@ func isRoleAllowed(userRole string, allowedRoles []string) bool {
 	}  
 	return false  
 }  
+
+// GenerateToken menghasilkan token JWT  
+func GenerateToken(userID uint, role string) (string, error) {  
+    expirationTime := time.Now().Add(24 * time.Hour) // Set waktu kedaluwarsa token  
+    claims := model.Claims{  
+        UserID: userID,  
+        Role:   role,  
+        RegisteredClaims: jwt.RegisteredClaims{  
+            ExpiresAt: jwt.NewNumericDate(expirationTime),  
+            IssuedAt:  jwt.NewNumericDate(time.Now()),  
+        },  
+    }  
+  
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)  
+    tokenString, err := token.SignedString([]byte("your_secret_key")) // Ganti dengan kunci rahasia Anda  
+    if err != nil {  
+        return "", err  
+    }  
+  
+    return tokenString, nil  
+}  
