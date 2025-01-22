@@ -140,21 +140,22 @@ func ValidateTokenMiddleware(next http.Handler) http.Handler {
 	})  
 }  
  
-// ValidateUser checks the username and password  
-func ValidateUser(username, password string) (model.User, error) {  
-	var user model.User  
-	// Fetch user from the database based on username  
-	if err := config.DB.Where("username = ?", username).First(&user).Error; err != nil {  
-		return model.User{}, errors.New("user not found")  
-	}  
+// ValidateUser checks the user's email and password  
+func ValidateUser(email, password string) (model.User, error) {    
+	var user model.User    
   
-	// Compare the provided password with the stored hashed password  
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {  
-		return model.User{}, errors.New("invalid password")  
-	}  
+	// Fetch user from the database based on email    
+	if err := config.DB.Where("email = ?", email).First(&user).Error; err != nil {    
+		return model.User{}, errors.New("user not found")    
+	}    
   
-	return user, nil  
-}  
+	// Compare the provided password with the stored hashed password    
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {    
+		return model.User{}, errors.New("invalid password")    
+	}    
+  
+	return user, nil    
+}   
 
 // Helper: Ambil token dari header Authorization  
 func GetTokenFromHeader(r *http.Request) (string, error) {  
