@@ -42,7 +42,7 @@ func GetAllLocation(w http.ResponseWriter, r *http.Request) {
   
 	// Fetch locations from the database (assuming you have a function to do this)  
 	var locations []model.Location  
-	if err := (&locations); err != nil {  
+	if err := config.DB.Find(&locations).Error; err != nil {  
 		http.Error(w, "Failed to fetch locations", http.StatusInternalServerError)  
 		return  
 	}  
