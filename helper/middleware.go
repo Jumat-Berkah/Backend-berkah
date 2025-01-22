@@ -239,17 +239,6 @@ func ScheduleTokenCleanup() error {
 	return nil  
 }  
   
-// Helper: Periksa apakah role pengguna termasuk dalam allowedRoles  
-func isRoleAllowed(userRole string, allowedRoles []string) bool {  
-	userRoleLower := strings.ToLower(userRole)  
-	for _, role := range allowedRoles {  
-		if strings.ToLower(role) == userRoleLower {  
-			return true  
-		}  
-	}  
-	return false  
-}  
-
 // GenerateToken generates a JWT token    
 func GenerateToken(userID uint, role string) (string, error) {    
     expirationTime := time.Now().Add(2 * time.Hour) // Set expiration time to 2 hours    
