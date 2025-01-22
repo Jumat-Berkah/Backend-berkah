@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-co-op/gocron"
 	"github.com/golang-jwt/jwt/v4"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Middleware untuk memvalidasi role pengguna
@@ -138,7 +139,23 @@ func ValidateTokenMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))  
 	})  
 }  
+ 
+// ValidateUser checks the username and password  
+func ValidateUser(username, password string) (model.User, error) {  
+	var user model.User  
+	// Fetch user from the database based on username  
+	if err := config.DB.Where("username = ?", username).First(&user).Error; err != nil {  
+		return model.User{}, errors.New("user not found")  
+	}  
   
+	// Compare the provided password with the stored hashed password  
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {  
+		return model.User{}, errors.New("invalid password")  
+	}  
+  
+	return user, nil  
+}  
+
 // Helper: Ambil token dari header Authorization  
 func GetTokenFromHeader(r *http.Request) (string, error) {  
 	authHeader := r.Header.Get("Authorization")  
@@ -232,23 +249,24 @@ func isRoleAllowed(userRole string, allowedRoles []string) bool {
 	return false  
 }  
 
-// GenerateToken menghasilkan token JWT  
-func GenerateToken(userID uint, role string) (string, error) {  
-    expirationTime := time.Now().Add(24 * time.Hour) // Set waktu kedaluwarsa token  
-    claims := model.Claims{  
-        UserID: userID,  
-        Role:   role,  
-        RegisteredClaims: jwt.RegisteredClaims{  
-            ExpiresAt: jwt.NewNumericDate(expirationTime),  
-            IssuedAt:  jwt.NewNumericDate(time.Now()),  
-        },  
-    }  
-  
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)  
-    tokenString, err := token.SignedString([]byte("your_secret_key")) // Ganti dengan kunci rahasia Anda  
-    if err != nil {  
-        return "", err  
-    }  
-  
-    return tokenString, nil  
+// GenerateToken generates a JWT token    
+func GenerateToken(userID uint, role string) (string, error) {    
+    expirationTime := time.Now().Add(2 * time.Hour) // Set expiration time to 2 hours    
+    claims := model.Claims{    
+        UserID: userID,    
+        Role:   role,    
+        RegisteredClaims: jwt.RegisteredClaims{    
+            ExpiresAt: jwt.NewNumericDate(expirationTime),    
+            IssuedAt:  jwt.NewNumericDate(time.Now()),    
+        },    
+    }    
+    
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)    
+    tokenString, err := token.SignedString(config.JwtKey) // Use your secret key from config    
+    if err != nil {    
+        return "", err    
+    }    
+    
+    return tokenString, nil    
 }  
+

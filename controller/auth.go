@@ -113,64 +113,49 @@ func Register(w http.ResponseWriter, r *http.Request) {
     })        
 }  
   
-// Login handles user login  
-func Login(w http.ResponseWriter, r *http.Request) {  
-    // Validasi metode HTTP  
-    if r.Method != http.MethodPost {  
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)  
-        return  
-    }  
-  
-    // Decode input  
-    var loginInput model.LoginInput  
-    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {  
-        log.Printf("Invalid request payload: %v", err)  
-        http.Error(w, "Invalid request payload", http.StatusBadRequest)  
-        return  
-    }  
-  
-    // Validasi input  
-    if loginInput.Email == "" || loginInput.Password == "" {  
-        http.Error(w, "Email and password are required", http.StatusBadRequest)  
-        return  
-    }  
-  
-    // Cari pengguna berdasarkan email  
-    var user model.User  
-    if err := config.DB.Where("email = ?", loginInput.Email).First(&user).Error; err != nil {  
-        log.Printf("User not found: %v", err)  
-        http.Error(w, "Invalid email or password", http.StatusUnauthorized)  
-        return  
-    }  
-  
-    // Verifikasi password  
-    if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginInput.Password)); err != nil {  
-        log.Printf("Invalid password: %v", err)  
-        http.Error(w, "Invalid email or password", http.StatusUnauthorized)  
-        return  
-    }  
-  
-    token, err := helper.GenerateToken(user.ID, user.Role.Name)  
-	if err != nil {  
-    log.Printf("Failed to generate token for user ID: %d, error: %v", user.ID, err)  
-    http.Error(w, "Failed to generate token", http.StatusInternalServerError)  
-    return  
+// Login handles user login    
+func Login(w http.ResponseWriter, r *http.Request) {    
+    // Validasi metode HTTP    
+    if r.Method != http.MethodPost {    
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)    
+        return    
+    }    
+    
+    // Decode input    
+    var loginInput model.LoginInput    
+    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {    
+        log.Printf("Invalid request payload: %v", err)    
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)    
+        return    
+    }    
+    
+    // Validate input    
+    if loginInput.Email == "" || loginInput.Password == "" {    
+        http.Error(w, "Email and password are required", http.StatusBadRequest)    
+        return    
+    }    
+    
+    // Validate user credentials using your existing logic  
+    user, err := helper.ValidateUser(loginInput.Email, loginInput.Password)    
+    if err != nil {    
+        log.Printf("Invalid credentials: %v", err)    
+        http.Error(w, "Invalid username or password", http.StatusUnauthorized)    
+        return    
+    }    
+    
+    // Generate JWT token with 2-hour expiration using the GenerateToken function  
+    tokenString, err := helper.GenerateToken(user.ID, user.Role.Name) // Use user.Role.Name to get the role  
+    if err != nil {    
+        log.Printf("Error generating token: %v", err)    
+        http.Error(w, "Could not create token", http.StatusInternalServerError)    
+        return    
+    }    
+    
+    // Return the token to the client    
+    w.Header().Set("Content-Type", "application/json")    
+    json.NewEncoder(w).Encode(map[string]string{"token": tokenString})    
 }  
 
-  
-    // Kirim respons sukses dengan token  
-    w.Header().Set("Content-Type", "application/json")  
-    w.WriteHeader(http.StatusOK)  
-    json.NewEncoder(w).Encode(map[string]interface{}{  
-        "message": "Login successful",  
-        "token":   token,  
-        "user": map[string]interface{}{  
-            "id":    user.ID,  
-            "email": user.Email,  
-            "role":  user.RoleID,  
-        },  
-    })  
-}  
 
 
 
