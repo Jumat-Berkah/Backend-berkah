@@ -7,67 +7,54 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
+
+	"github.com/golang-jwt/jwt"
 )
 
-// GetLocation retrieves all locations or a specific location by ID
-func GetLocation(w http.ResponseWriter, r *http.Request) {  
+// GetAllLocation handles the retrieval of all locations
+func GetAllLocation(w http.ResponseWriter, r *http.Request) {  
 	// Set CORS headers  
 	if config.SetAccessControlHeaders(w, r) {  
-		return // Jika ini adalah permintaan preflight, keluar dari fungsi  
+		return // If it's a preflight request, return early  
 	}  
   
-	// Set content type to JSON  
-	w.Header().Set("Content-Type", "application/json")  
-  
-	// Validate the token from the Authorization header  
-	tokenString, err := helper.GetTokenFromHeader(r)  
-	if err != nil {  
-		log.Printf("Token error: %v", err)  
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)  
+	// Check for JWT token in the Authorization header  
+	authHeader := r.Header.Get("Authorization")  
+	if authHeader == "" {  
+		http.Error(w, "Authorization header is missing", http.StatusUnauthorized)  
 		return  
 	}  
   
-	// Check if the token is blacklisted  
-	if helper.IsTokenBlacklisted(tokenString) {  
-		log.Printf("Token is blacklisted: %v", tokenString)  
-		http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)  
+	// Extract the token from the header  
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")  
+	claims := &model.Claims{} // Assuming you have a Claims struct in your models package  
+  
+	// Parse the token  
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {  
+		return config.JwtKey, nil  
+	})  
+  
+	if err != nil || !token.Valid {  
+		http.Error(w, "Invalid token", http.StatusUnauthorized)  
 		return  
 	}  
   
-	// Verify the JWT token  
-	claims := &model.Claims{}  
-	if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {  
-		log.Printf("Token validation error: %v", err)  
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Ambil ID dari query parameter  
-	idStr := r.URL.Query().Get("id")  
-  
+	// Fetch locations from the database (assuming you have a function to do this)  
 	var locations []model.Location  
-  
-	if idStr != "" {  
-		// Jika ID diberikan, ambil lokasi berdasarkan ID  
-		var location model.Location  
-		if err := config.DB.First(&location, idStr).Error; err != nil {  
-			log.Printf("Failed to retrieve location: %v", err)  
-			http.Error(w, "Location not found.", http.StatusNotFound)  
-			return  
-		}  
-		locations = append(locations, location) // Tambahkan lokasi yang ditemukan ke slice  
-	} else {  
-		// Jika tidak ada ID, ambil semua lokasi  
-		if err := config.DB.Find(&locations).Error; err != nil {  
-			log.Printf("Failed to retrieve locations: %v", err)  
-			http.Error(w, "Failed to retrieve locations.", http.StatusInternalServerError)  
-			return  
-		}  
+	if err := (&locations); err != nil {  
+		http.Error(w, "Failed to fetch locations", http.StatusInternalServerError)  
+		return  
 	}  
   
-	// Kembalikan data lokasi  
+	// Set the response header to application/json  
+	w.Header().Set("Content-Type", "application/json")  
 	w.WriteHeader(http.StatusOK)  
-	json.NewEncoder(w).Encode(locations)  
+  
+	// Encode the locations to JSON and send the response  
+	if err := json.NewEncoder(w).Encode(locations); err != nil {  
+		http.Error(w, "Failed to encode locations", http.StatusInternalServerError)  
+	}  
 }  
   
 // CreateLocation handles POST requests to create new location data  

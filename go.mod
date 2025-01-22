@@ -6,6 +6,7 @@ toolchain go1.22.10
 
 require (
 	github.com/go-co-op/gocron v1.37.0
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/joho/godotenv v1.5.1
 	github.com/whatsauth/itmodel v0.0.8
