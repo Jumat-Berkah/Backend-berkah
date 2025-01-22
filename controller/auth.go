@@ -113,48 +113,55 @@ func Register(w http.ResponseWriter, r *http.Request) {
     })        
 }  
   
-// Login handles user login    
-func Login(w http.ResponseWriter, r *http.Request) {    
-    // Validasi metode HTTP    
-    if r.Method != http.MethodPost {    
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)    
-        return    
-    }    
-    
-    // Decode input    
-    var loginInput model.LoginInput    
-    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {    
-        log.Printf("Invalid request payload: %v", err)    
-        http.Error(w, "Invalid request payload", http.StatusBadRequest)    
-        return    
-    }    
-    
-    // Validate input    
-    if loginInput.Email == "" || loginInput.Password == "" {    
-        http.Error(w, "Email and password are required", http.StatusBadRequest)    
-        return    
-    }    
-    
-    // Validate user credentials using your existing logic  
-    user, err := helper.ValidateUser(loginInput.Email, loginInput.Password)    
-    if err != nil {    
-        log.Printf("Invalid credentials: %v", err)    
-        http.Error(w, "Invalid username or password", http.StatusUnauthorized)    
-        return    
-    }    
-    
-    // Generate JWT token with 2-hour expiration using the GenerateToken function  
-    tokenString, err := helper.GenerateToken(user.ID, user.Role.Name) // Use user.Role.Name to get the role  
-    if err != nil {    
-        log.Printf("Error generating token: %v", err)    
-        http.Error(w, "Could not create token", http.StatusInternalServerError)    
-        return    
-    }    
-    
-    // Return the token to the client    
-    w.Header().Set("Content-Type", "application/json")    
-    json.NewEncoder(w).Encode(map[string]string{"token": tokenString})    
+// Login handles user login      
+func Login(w http.ResponseWriter, r *http.Request) {      
+    // Validasi metode HTTP      
+    if r.Method != http.MethodPost {      
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)      
+        return      
+    }      
+      
+    // Decode input      
+    var loginInput model.LoginInput      
+    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {      
+        log.Printf("Invalid request payload: %v", err)      
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)      
+        return      
+    }      
+      
+    // Validate input      
+    if loginInput.Email == "" || loginInput.Password == "" {      
+        http.Error(w, "Email and password are required", http.StatusBadRequest)      
+        return      
+    }      
+      
+    // Validate user credentials using the ValidateUser function    
+    user, err := helper.ValidateUser(loginInput.Email, loginInput.Password)      
+    if err != nil {      
+        log.Printf("Invalid credentials: %v", err)      
+        http.Error(w, "Invalid username or password", http.StatusUnauthorized)      
+        return      
+    }      
+      
+    // Generate JWT token with 2-hour expiration using the GenerateToken function    
+    tokenString, err := helper.GenerateToken(user.ID, user.Role.Name) // Use user.Role.Name to get the role    
+    if err != nil {      
+        log.Printf("Error generating token: %v", err)      
+        http.Error(w, "Could not create token", http.StatusInternalServerError)      
+        return      
+    }      
+      
+    // Return the token and user information to the client      
+    w.Header().Set("Content-Type", "application/json")      
+    json.NewEncoder(w).Encode(map[string]interface{}{  
+        "token": tokenString,  
+        "user": map[string]interface{}{  
+            "id":   user.ID,  
+            "role": user.Role.Name,  
+        },  
+    })      
 }  
+
 
 
 
