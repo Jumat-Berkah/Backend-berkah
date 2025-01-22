@@ -9,54 +9,70 @@ import (
 	"net/http"
 )
 
-// GetLocation retrieves all locations
-func GetLocation(w http.ResponseWriter, r *http.Request) {    
-	// Set CORS headers    
-	if config.SetAccessControlHeaders(w, r) {    
-		return // Jika ini adalah permintaan preflight, keluar dari fungsi    
-	}    
-    
-	// Set content type to JSON    
-	w.Header().Set("Content-Type", "application/json")    
-    
-	// Validate the token from the Authorization header    
-	tokenString, err := helper.GetTokenFromHeader(r)    
-	if err != nil {    
-		log.Printf("Token error: %v", err)    
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)    
-		return    
-	}    
-    
-	// Check if the token is blacklisted    
-	if helper.IsTokenBlacklisted(tokenString) {    
-		log.Printf("Token is blacklisted: %v", tokenString)    
-		http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)    
-		return    
-	}    
-    
-	// Verify the JWT token    
-	claims := &model.Claims{}    
-	if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {    
-		log.Printf("Token validation error: %v", err)    
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)    
-		return    
-	}    
-    
-	// Query the database for all locations    
-	var locations []model.Location    
-	if err := config.DB.Find(&locations).Error; err != nil {    
-		log.Printf("Failed to retrieve locations: %v", err)    
-		http.Error(w, "Failed to retrieve locations.", http.StatusInternalServerError)    
-		return    
-	}    
+// GetLocation retrieves all locations or a specific location by ID  
+func GetLocation(w http.ResponseWriter, r *http.Request) {  
+    // Set CORS headers      
+    if config.SetAccessControlHeaders(w, r) {      
+        return // Jika ini adalah permintaan preflight, keluar dari fungsi      
+    }      
   
-	// Log the successful retrieval of locations    
-	log.Printf("Successfully retrieved %d locations.", len(locations))   
-    
-	// Return the locations data    
-	w.WriteHeader(http.StatusOK)    
-	json.NewEncoder(w).Encode(locations)    
+    // Set content type to JSON      
+    w.Header().Set("Content-Type", "application/json")      
+  
+    // Validate the token from the Authorization header      
+    tokenString, err := helper.GetTokenFromHeader(r)      
+    if err != nil {      
+        log.Printf("Token error: %v", err)      
+        http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)      
+        return      
+    }      
+  
+    // Check if the token is blacklisted      
+    if helper.IsTokenBlacklisted(tokenString) {      
+        log.Printf("Token is blacklisted: %v", tokenString)      
+        http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)      
+        return      
+    }      
+  
+    // Verify the JWT token      
+    claims := &model.Claims{}      
+    if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {      
+        log.Printf("Token validation error: %v", err)      
+        http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)      
+        return      
+    }      
+  
+    // Get the ID from the URL parameters  
+    id := r.URL.Query().Get("id") // Ambil ID dari query parameter  
+  
+    var locations []model.Location  
+  
+    if id != "" {  
+        // Jika ID diberikan, ambil lokasi berdasarkan ID  
+        var location model.Location  
+        if err := config.DB.First(&location, id).Error; err != nil {  
+            log.Printf("Failed to retrieve location: %v", err)      
+            http.Error(w, "Location not found.", http.StatusNotFound)      
+            return      
+        }  
+        locations = append(locations, location) // Tambahkan lokasi ke slice  
+    } else {  
+        // Jika tidak ada ID, ambil semua lokasi  
+        if err := config.DB.Find(&locations).Error; err != nil {      
+            log.Printf("Failed to retrieve locations: %v", err)      
+            http.Error(w, "Failed to retrieve locations.", http.StatusInternalServerError)      
+            return      
+        }  
+    }  
+  
+    // Log the successful retrieval of locations      
+    log.Printf("Successfully retrieved %d locations.", len(locations))     
+  
+    // Return the locations data      
+    w.WriteHeader(http.StatusOK)      
+    json.NewEncoder(w).Encode(locations)      
 }  
+  
 
 
 // CreateLocation handles POST requests to create new location data  
