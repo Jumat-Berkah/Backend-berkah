@@ -35,8 +35,8 @@ func URL(w http.ResponseWriter, r *http.Request) {
 
 	case method == "GET" && path == "/getlocation":
 		controller.GetLocation(w, r)
-	case method == "GET" && path == "/getlocationbyid":
-		controller.GetLocationByID(w, r)
+	// case method == "GET" && path == "/getlocationbyid":
+	// 	controller.GetLocationByID(w, r)
 	case method == "POST" && path == "/createlocation":
 		controller.CreateLocation(w, r)
 	case method == "PUT" && path == "/updatelocation":
