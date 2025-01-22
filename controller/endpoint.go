@@ -7,54 +7,42 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
-
-	"github.com/golang-jwt/jwt"
 )
 
 // GetAllLocation handles the retrieval of all locations
-func GetAllLocation(w http.ResponseWriter, r *http.Request) {  
-	// Set CORS headers  
-	if config.SetAccessControlHeaders(w, r) {  
-		return // If it's a preflight request, return early  
-	}  
+func GetAllLocation(w http.ResponseWriter, r *http.Request) {    
+	// Set CORS headers    
+	if config.SetAccessControlHeaders(w, r) {    
+		return // If it's a preflight request, return early    
+	}    
+    
+	// Check for JWT token in the Authorization header    
+	authHeader := r.Header.Get("Authorization")    
+	if authHeader == "" {    
+		http.Error(w, "Authorization header is missing", http.StatusUnauthorized)    
+		return    
+	}    
   
-	// Check for JWT token in the Authorization header  
-	authHeader := r.Header.Get("Authorization")  
-	if authHeader == "" {  
-		http.Error(w, "Authorization header is missing", http.StatusUnauthorized)  
+	// Extract the token from the Authorization header  
+	tokenString := authHeader[len("Bearer "):] // Assuming the format is "Bearer <token>"  
+  
+	// Validate the token  
+	claims := &model.Claims{}  
+	if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {  
+		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)  
 		return  
 	}  
   
-	// Extract the token from the header  
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")  
-	claims := &model.Claims{} // Assuming you have a Claims struct in your models package  
-  
-	// Parse the token  
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {  
-		return config.JwtKey, nil  
-	})  
-  
-	if err != nil || !token.Valid {  
-		http.Error(w, "Invalid token", http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Fetch locations from the database (assuming you have a function to do this)  
+	// Retrieve up to 20 locations from the database  
 	var locations []model.Location  
-	if err := config.DB.Find(&locations).Error; err != nil {  
-		http.Error(w, "Failed to fetch locations", http.StatusInternalServerError)  
+	if err := config.DB.Limit(15).Find(&locations).Error; err != nil {  
+		http.Error(w, "Could not retrieve locations: "+err.Error(), http.StatusInternalServerError)  
 		return  
 	}  
   
-	// Set the response header to application/json  
+	// Return the locations as JSON  
 	w.Header().Set("Content-Type", "application/json")  
-	w.WriteHeader(http.StatusOK)  
-  
-	// Encode the locations to JSON and send the response  
-	if err := json.NewEncoder(w).Encode(locations); err != nil {  
-		http.Error(w, "Failed to encode locations", http.StatusInternalServerError)  
-	}  
+	json.NewEncoder(w).Encode(locations)  
 }  
   
 // CreateLocation handles POST requests to create new location data  
