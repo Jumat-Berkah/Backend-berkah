@@ -86,7 +86,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
         Email:    requestData.Email,        
         Username: requestData.Username,        
         Password: string(hashedPassword),        
-        RoleID:   2, // Default role for regular users        
+        RoleID:   1, // Default role for regular users        
     }        
   
     if err := config.DB.Create(&user).Error; err != nil {        
@@ -112,55 +112,68 @@ func Register(w http.ResponseWriter, r *http.Request) {
         },        
     })        
 }  
-  
-// Login handles user login      
-func Login(w http.ResponseWriter, r *http.Request) {      
-    // Validasi metode HTTP      
-    if r.Method != http.MethodPost {      
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)      
-        return      
-    }      
-      
-    // Decode input      
-    var loginInput model.LoginInput      
-    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {      
-        log.Printf("Invalid request payload: %v", err)      
-        http.Error(w, "Invalid request payload", http.StatusBadRequest)      
-        return      
-    }      
-      
-    // Validate input      
-    if loginInput.Email == "" || loginInput.Password == "" {      
-        http.Error(w, "Email and password are required", http.StatusBadRequest)      
-        return      
-    }      
-      
-    // Validate user credentials using the ValidateUser function    
-    user, err := helper.ValidateUser(loginInput.Email, loginInput.Password)      
-    if err != nil {      
-        log.Printf("Invalid credentials: %v", err)      
-        http.Error(w, "Invalid username or password", http.StatusUnauthorized)      
-        return      
-    }      
-      
-    // Generate JWT token with 2-hour expiration using the GenerateToken function    
-    tokenString, err := helper.GenerateToken(user.ID, user.Role.Name) // Use user.Role.Name to get the role    
-    if err != nil {      
-        log.Printf("Error generating token: %v", err)      
-        http.Error(w, "Could not create token", http.StatusInternalServerError)      
-        return      
-    }      
-      
-    // Return the token and user information to the client      
-    w.Header().Set("Content-Type", "application/json")      
-    json.NewEncoder(w).Encode(map[string]interface{}{  
-        "token": tokenString,  
-        "user": map[string]interface{}{  
-            "id":   user.ID,  
-            "role": user.Role.Name,  
-        },  
-    })      
-}  
+        
+// Login handles user login
+func Login(w http.ResponseWriter, r *http.Request) {
+    // Validate HTTP method
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+
+    // Decode input
+    var loginInput model.LoginInput
+    if err := json.NewDecoder(r.Body).Decode(&loginInput); err != nil {
+        log.Printf("Invalid request payload: %v", err)
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)
+        return
+    }
+
+    // Validate input
+    if loginInput.Email == "" || loginInput.Password == "" {
+        http.Error(w, "Email and password are required", http.StatusBadRequest)
+        return
+    }
+
+    // Validate user credentials using the ValidateUser function
+    user, err := helper.ValidateUser(loginInput.Email, loginInput.Password)
+    if err != nil {
+        log.Printf("Invalid credentials: %v", err)
+        http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+        return
+    }
+
+    // Check user role
+    var role string
+    if user.Role.ID == 1 {
+        role = "user"
+    } else if user.Role.ID == 2 {
+        role = "admin"
+    } else {
+        log.Printf("Unknown role ID: %d", user.Role.ID)
+        http.Error(w, "Invalid user role", http.StatusUnauthorized)
+        return
+    }
+
+    // Generate JWT token with 2-hour expiration using the GenerateToken function
+    tokenString, err := helper.GenerateToken(user.ID, role)
+    if err != nil {
+        log.Printf("Error generating token: %v", err)
+        http.Error(w, "Could not create token", http.StatusInternalServerError)
+        return
+    }
+
+    // Return the token and user information to the client
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "token": tokenString,
+        "user": map[string]interface{}{
+            "id":   user.ID,
+            "role": role,
+        },
+    })
+}
+
 
 
 
