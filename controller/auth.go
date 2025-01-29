@@ -144,20 +144,15 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Determine user role
-    var role string
-    if user.Role.ID == 1 {
-        role = "user"
-    } else if user.Role.ID == 2 {
-        role = "admin"
-    } else {
-        log.Printf("Unknown role ID: %d", user.Role.ID)
+    // Check user role
+    if user.Role.ID == 0 {
+        log.Printf("Invalid user role for user ID: %d", user.ID)
         http.Error(w, "Invalid user role", http.StatusUnauthorized)
         return
     }
 
     // Generate JWT token
-    tokenString, err := helper.GenerateToken(user.ID, role)
+    tokenString, err := helper.GenerateToken(user.ID, user.Role.Name)
     if err != nil {
         log.Printf("Error generating token: %v", err)
         http.Error(w, "Could not create token", http.StatusInternalServerError)
@@ -168,7 +163,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
     expirationTime := time.Now().Add(2 * time.Hour)
 
     // Store token in tokens table
-    if err := helper.StoreToken(tokenString, user.ID, role, expirationTime); err != nil {
+    if err := helper.StoreToken(tokenString, user.ID, user.Role.Name, expirationTime); err != nil {
         log.Printf("Error storing token in tokens table: %v", err)
         http.Error(w, "Could not store token", http.StatusInternalServerError)
         return
@@ -187,10 +182,11 @@ func Login(w http.ResponseWriter, r *http.Request) {
         "token": tokenString,
         "user": map[string]interface{}{
             "id":   user.ID,
-            "role": role,
+            "role": user.Role.Name,
         },
     })
 }
+
 
 
 
