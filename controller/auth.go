@@ -13,107 +13,62 @@ import (
 )
 
 // Register handles user registration (only for user role)
-func Register(w http.ResponseWriter, r *http.Request) {        
-    // Ensure the HTTP method is POST        
-    if r.Method != http.MethodPost {        
-        w.Header().Set("Content-Type", "application/json")        
-        w.WriteHeader(http.StatusMethodNotAllowed)        
-        json.NewEncoder(w).Encode(map[string]string{        
-            "message": "Method not allowed. Please use POST.",        
-        })        
-        return        
-    }        
-  
-    var requestData model.RequestData        
-  
-    // Parse JSON request body        
-    if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {        
-        log.Printf("Invalid request data: %v", err)        
-        w.Header().Set("Content-Type", "application/json")        
-        w.WriteHeader(http.StatusBadRequest)        
-        json.NewEncoder(w).Encode(map[string]string{        
-            "message": "Invalid input. Please check your request data.",        
-        })        
-        return        
-    }        
-  
-	//validate input
-	if requestData.Password != requestData.ConfirmPassword {  
-		w.Header().Set("Content-Type", "application/json")  
-		w.WriteHeader(http.StatusBadRequest)  
-		json.NewEncoder(w).Encode(map[string]string{  
-			"message": "Passwords do not match.",  
-		})  
-		return  
-	}  
-	 
-   
-  
-    if requestData.Email == "" || requestData.Username == "" || requestData.Password == "" {        
-        w.Header().Set("Content-Type", "application/json")        
-        w.WriteHeader(http.StatusBadRequest)        
-        json.NewEncoder(w).Encode(map[string]string{        
-            "message": "All fields are required.",        
-        })        
-        return        
-    }        
-  
-    // Check if email or username already exists        
-    var existingUser model.User        
-    if err := config.DB.Where("email = ? OR username = ?", requestData.Email, requestData.Username).First(&existingUser).Error; err == nil {        
-        log.Printf("User already exists with email: %s or username: %s", requestData.Email, requestData.Username)        
-        w.Header().Set("Content-Type", "application/json")        
-        w.WriteHeader(http.StatusBadRequest)        
-        json.NewEncoder(w).Encode(map[string]string{        
-            "message": "Email or username already exists. Please use a different one.",        
-        })        
-        return        
-    }        
-  
-    // Hash password        
-    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestData.Password), bcrypt.DefaultCost)        
-    if err != nil {        
-        log.Printf("Failed to hash password: %v", err)        
-        w.Header().Set("Content-Type", "application/json")        
-        w.WriteHeader(http.StatusInternalServerError)        
-        json.NewEncoder(w).Encode(map[string]string{        
-            "message": "Failed to hash password.",        
-        })        
-        return        
-    }        
-  
-    // Save user to database with default role_id = 2 (user)        
-    user := model.User{        
-        Email:    requestData.Email,        
-        Username: requestData.Username,        
-        Password: string(hashedPassword),        
-        RoleID:   1, // Default role for regular users        
-    }        
-  
-    if err := config.DB.Create(&user).Error; err != nil {        
-        log.Printf("Failed to create user: %v", err)        
-        w.Header().Set("Content-Type", "application/json")        
-        w.WriteHeader(http.StatusInternalServerError)        
-        json.NewEncoder(w).Encode(map[string]string{        
-            "message": "Failed to register user. Please try again later.",        
-        })        
-        return        
-    }        
-  
-    // Send success response        
-    w.Header().Set("Content-Type", "application/json")        
-    w.WriteHeader(http.StatusCreated)        
-    json.NewEncoder(w).Encode(map[string]interface{}{        
-        "message": "User registered successfully",        
-        "user": map[string]interface{}{        
-            "id":       user.ID,        
-            "email":    user.Email,        
-            "username": user.Username,        
-            "role_id":  user.RoleID, // Include role ID in the response        
-        },        
-    })        
-}  
-        
+func Register(w http.ResponseWriter, r *http.Request) {
+    // Ensure the HTTP method is POST
+    if r.Method != http.MethodPost {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusMethodNotAllowed)
+        json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
+        return
+    }
+
+    // Decode the request body
+    var newUser model.User
+    if err := json.NewDecoder(r.Body).Decode(&newUser); err != nil {
+        log.Printf("Invalid request payload: %v", err)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request payload"})
+        return
+    }
+
+    // Validate input
+    if newUser.Email == "" || newUser.Password == "" || newUser.Username == "" {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{"error": "Email, username, and password are required"})
+        return
+    }
+
+    // Hash the password
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
+    if err != nil {
+        log.Printf("Error hashing password: %v", err)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(map[string]string{"error": "Could not hash password"})
+        return
+    }
+    newUser.Password = string(hashedPassword)
+
+    // Set the role ID (assuming user role ID is 1)
+    newUser.RoleID = 1 // Adjust this based on your role management
+
+    // Save the user to the database
+    if err := config.DB.Create(&newUser).Error; err != nil {
+        log.Printf("Error saving user to database: %v", err)
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusInternalServerError)
+        json.NewEncoder(w).Encode(map[string]string{"error": "Could not register user"})
+        return
+    }
+
+    // Respond with success
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
+}
+
 // Login handles user login
 func Login(w http.ResponseWriter, r *http.Request) {
     // Validate HTTP method
@@ -144,8 +99,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Check user role
-    if user.Role.ID == 0 {
+    // Check if the user role is valid
+    if user.RoleID == 0 {
         log.Printf("Invalid user role for user ID: %d", user.ID)
         http.Error(w, "Invalid user role", http.StatusUnauthorized)
         return
@@ -186,6 +141,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
         },
     })
 }
+
 
 
 
