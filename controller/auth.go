@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -135,7 +136,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Validate user credentials using the ValidateUser function
+    // Validate user credentials
     user, err := helper.ValidateUser(loginInput.Email, loginInput.Password)
     if err != nil {
         log.Printf("Invalid credentials: %v", err)
@@ -143,7 +144,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Check user role
+    // Determine user role
     var role string
     if user.Role.ID == 1 {
         role = "user"
@@ -155,7 +156,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Generate JWT token with 2-hour expiration using the GenerateToken function
+    // Generate JWT token
     tokenString, err := helper.GenerateToken(user.ID, role)
     if err != nil {
         log.Printf("Error generating token: %v", err)
@@ -163,7 +164,24 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Return the token and user information to the client
+    // Set expiration time
+    expirationTime := time.Now().Add(2 * time.Hour)
+
+    // Store token in tokens table
+    if err := helper.StoreToken(tokenString, user.ID, role, expirationTime); err != nil {
+        log.Printf("Error storing token in tokens table: %v", err)
+        http.Error(w, "Could not store token", http.StatusInternalServerError)
+        return
+    }
+
+    // Store token in active_tokens table
+    if err := helper.StoreActiveToken(tokenString, user.ID, expirationTime); err != nil {
+        log.Printf("Error storing token in active_tokens table: %v", err)
+        http.Error(w, "Could not store token", http.StatusInternalServerError)
+        return
+    }
+
+    // Return the token and user information
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]interface{}{
         "token": tokenString,
@@ -173,6 +191,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
         },
     })
 }
+
 
 
 
