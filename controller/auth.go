@@ -109,15 +109,16 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Check if the user role is valid
-    if user.RoleID == 0 {
-        log.Printf("Invalid user role for user ID: %d", user.ID)
-        http.Error(w, "Invalid user role", http.StatusUnauthorized)
+    // Fetch the role based on role_id
+    var role model.Role
+    if err := config.DB.First(&role, user.RoleID).Error; err != nil {
+        log.Printf("Error fetching role: %v", err)
+        http.Error(w, "Could not fetch user role", http.StatusInternalServerError)
         return
     }
 
     // Generate JWT token
-    tokenString, err := helper.GenerateToken(user.ID, user.Role.Name)
+    tokenString, err := helper.GenerateToken(user.ID, role.Name)
     if err != nil {
         log.Printf("Error generating token: %v", err)
         http.Error(w, "Could not create token", http.StatusInternalServerError)
@@ -130,10 +131,11 @@ func Login(w http.ResponseWriter, r *http.Request) {
         "token": tokenString,
         "user": map[string]interface{}{
             "id":   user.ID,
-            "role": user.Role.Name, // Ensure the role is included
+            "role": role.Name, // Include the role name
         },
     })
 }
+
 
 
 
