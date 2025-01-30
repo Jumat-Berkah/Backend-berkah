@@ -33,10 +33,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 	case method == "POST" && path == "/login":
 		controller.Login(w, r)
 
+	// admin route untuk manage crud	
 	case method == "GET" && path == "/getlocation":
 		controller.GetAllLocation(w, r)
-	// case method == "GET" && path == "/getlocationbyid":
-	// 	controller.GetLocationByID(w, r)
 	case method == "POST" && path == "/createlocation":
 		controller.CreateLocation(w, r)
 	case method == "PUT" && path == "/updatelocation":
