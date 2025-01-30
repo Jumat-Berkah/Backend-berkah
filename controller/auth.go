@@ -12,7 +12,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Register handles user registration (only for user role)
 func Register(w http.ResponseWriter, r *http.Request) {
     // Ensure the HTTP method is POST
     if r.Method != http.MethodPost {
@@ -37,6 +36,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusBadRequest)
         json.NewEncoder(w).Encode(map[string]string{"error": "Email, username, and password are required"})
+        return
+    }
+
+    // Check if the user already exists
+    var existingUser model.User
+    if err := config.DB.Where("email = ? OR username = ?", newUser.Email, newUser.Username).First(&existingUser).Error; err == nil {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusBadRequest)
+        json.NewEncoder(w).Encode(map[string]string{"error": "Email or username already exists"})
         return
     }
 
@@ -66,7 +74,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
     // Respond with success
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
+    json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully", "user": newUser.Username})
 }
 
 // Login handles user login
