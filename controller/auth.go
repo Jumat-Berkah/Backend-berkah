@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -71,13 +70,16 @@ func Register(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Respond with success
+    // Respond with success, including the username
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully", "user": newUser.Username})
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "message": "User registered successfully",
+        "user":    newUser.Username, // Return the username
+    })
 }
 
-// Login handles user login
+// untuk handle login function
 func Login(w http.ResponseWriter, r *http.Request) {
     // Validate HTTP method
     if r.Method != http.MethodPost {
@@ -122,33 +124,17 @@ func Login(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Set expiration time
-    expirationTime := time.Now().Add(2 * time.Hour)
-
-    // Store token in tokens table
-    if err := helper.StoreToken(tokenString, user.ID, user.Role.Name, expirationTime); err != nil {
-        log.Printf("Error storing token in tokens table: %v", err)
-        http.Error(w, "Could not store token", http.StatusInternalServerError)
-        return
-    }
-
-    // Store token in active_tokens table
-    if err := helper.StoreActiveToken(tokenString, user.ID, expirationTime); err != nil {
-        log.Printf("Error storing token in active_tokens table: %v", err)
-        http.Error(w, "Could not store token", http.StatusInternalServerError)
-        return
-    }
-
     // Return the token and user information
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string]interface{}{
         "token": tokenString,
         "user": map[string]interface{}{
             "id":   user.ID,
-            "role": user.Role.Name,
+            "role": user.Role.Name, // Ensure the role is included
         },
     })
 }
+
 
 
 
