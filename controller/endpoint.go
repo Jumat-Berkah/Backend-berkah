@@ -127,87 +127,88 @@ func CreateLocation(w http.ResponseWriter, r *http.Request) {
 }  
 
 
-// UpdateLocation handles PUT requests to update existing location data  
-func UpdateLocation(w http.ResponseWriter, r *http.Request) {  
-	// Set CORS headers  
-	if config.SetAccessControlHeaders(w, r) {  
-		return // Jika ini adalah permintaan preflight, keluar dari fungsi  
-	}  
-  
-	// Set content type to JSON  
-	w.Header().Set("Content-Type", "application/json")  
-  
-	// Validate the token from the Authorization header  
-	tokenString, err := helper.GetTokenFromHeader(r)  
-	if err != nil {  
-		log.Printf("Token error: %v", err)  
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Check if the token is blacklisted  
-	if helper.IsTokenBlacklisted(tokenString) {  
-		log.Printf("Token is blacklisted: %v", tokenString)  
-		http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Verify the JWT token  
-	claims := &model.Claims{}  
-	if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {  
-		log.Printf("Token validation error: %v", err)  
-		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)  
-		return  
-	}  
-  
-	// Parse the request body to extract updated location details  
-	var updatedLocation model.Location  
-	if err := json.NewDecoder(r.Body).Decode(&updatedLocation); err != nil {  
-		log.Printf("Failed to decode request body: %v", err)  
-		http.Error(w, "Invalid request body", http.StatusBadRequest)  
-		return  
-	}  
-  
-	// Validate the ID  
-	if updatedLocation.ID == 0 {  
-		http.Error(w, "ID is required", http.StatusBadRequest)  
-		return  
-	}  
-  
-	// Input validation  
-	if updatedLocation.Name == "" {  
-		log.Printf("Name is missing")  
-		http.Error(w, "Name is missing", http.StatusBadRequest)  
-		return  
-	}  
-	if updatedLocation.Address == "" {  
-		log.Printf("Address is missing")  
-		http.Error(w, "Address is missing", http.StatusBadRequest)  
-		return  
-	}  
-  
-	// Update the location in the database  
-	result := config.DB.Model(&model.Location{}).Where("id = ?", updatedLocation.ID).Updates(updatedLocation)  
-	if result.Error != nil {  
-		log.Printf("Failed to update location: %v", result.Error)  
-		http.Error(w, "Failed to update location", http.StatusInternalServerError)  
-		return  
-	}  
-  
-	// Check if any rows were affected  
-	if result.RowsAffected == 0 {  
-		log.Printf("Location not found: ID=%d", updatedLocation.ID)  
-		http.Error(w, "Location not found", http.StatusNotFound)  
-		return  
-	}  
-  
-	// Log successful update  
-	log.Printf("Location updated successfully: ID=%d", updatedLocation.ID)  
-  
-	// Return success response  
-	w.WriteHeader(http.StatusOK)  
-	json.NewEncoder(w).Encode(map[string]string{"message": "Location updated successfully"})  
-}  
+// UpdateLocation handles PUT requests to update existing location data
+func UpdateLocation(w http.ResponseWriter, r *http.Request) {
+    // Set CORS headers
+    if config.SetAccessControlHeaders(w, r) {
+        return // If this is a preflight request, exit the function
+    }
+
+    // Set content type to JSON
+    w.Header().Set("Content-Type", "application/json")
+
+    // Validate the token from the Authorization header
+    tokenString, err := helper.GetTokenFromHeader(r)
+    if err != nil {
+        log.Printf("Token error: %v", err)
+        http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+        return
+    }
+
+    // Check if the token is blacklisted
+    if helper.IsTokenBlacklisted(tokenString) {
+        log.Printf("Token is blacklisted: %v", tokenString)
+        http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)
+        return
+    }
+
+    // Verify the JWT token
+    claims := &model.Claims{}
+    if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {
+        log.Printf("Token validation error: %v", err)
+        http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+        return
+    }
+
+    // Parse the request body to extract updated location details
+    var updatedLocation model.Location
+    if err := json.NewDecoder(r.Body).Decode(&updatedLocation); err != nil {
+        log.Printf("Failed to decode request body: %v", err)
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+
+    // Validate the ID
+    if updatedLocation.ID == 0 {
+        http.Error(w, "ID is required", http.StatusBadRequest)
+        return
+    }
+
+    // Input validation
+    if updatedLocation.Name == "" {
+        log.Printf("Name is missing")
+        http.Error(w, "Name is missing", http.StatusBadRequest)
+        return
+    }
+    if updatedLocation.Address == "" {
+        log.Printf("Address is missing")
+        http.Error(w, "Address is missing", http.StatusBadRequest)
+        return
+    }
+
+    // Update the location in the database
+    result := config.DB.Model(&model.Location{}).Where("id = ?", updatedLocation.ID).Updates(updatedLocation)
+    if result.Error != nil {
+        log.Printf("Failed to update location: %v", result.Error)
+        http.Error(w, "Failed to update location", http.StatusInternalServerError)
+        return
+    }
+
+    // Check if any rows were affected
+    if result.RowsAffected == 0 {
+        log.Printf("Location not found: ID=%d", updatedLocation.ID)
+        http.Error(w, "Location not found", http.StatusNotFound)
+        return
+    }
+
+    // Log successful update
+    log.Printf("Location updated successfully: ID=%d", updatedLocation.ID)
+
+    // Return success response
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"message": "Location updated successfully"})
+}
+
  
 // DeleteLocation handles DELETE requests to delete existing location data  
 func DeleteLocation(w http.ResponseWriter, r *http.Request) {  
