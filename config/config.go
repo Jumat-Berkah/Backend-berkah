@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 var UserIDKey = "userID"  
@@ -13,6 +15,17 @@ var RoleKey = "role"
 
 // JwtKey will hold the JWT secret key
 var JwtKey []byte
+
+var (
+    GoogleOauthConfig = oauth2.Config{
+        RedirectURL:  "https://rrq-dev.github.io/jumatberkah.github.io/auth/callback",
+        ClientID:     os.Getenv("CLIENT_ID"),
+        ClientSecret: os.Getenv("CLIENT_SECRET"),
+        Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+        Endpoint:     google.Endpoint,
+    }
+    OauthStateString = "random-state"
+)
 
 // LoadEnv loads environment variables and initializes JwtKey
 func LoadEnv() {

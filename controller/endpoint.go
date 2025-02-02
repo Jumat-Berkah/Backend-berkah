@@ -8,7 +8,23 @@ import (
 	"log"
 	"net/http"
 )
+func GetLocation(w http.ResponseWriter, r *http.Request) {    
+    // Set CORS headers    
+    if config.SetAccessControlHeaders(w, r) {    
+        return // If it's a preflight request, return early    
+    }    
 
+    // Retrieve up to 15 locations from the database  
+    var locations []model.Location  
+    if err := config.DB.Limit(15).Find(&locations).Error; err != nil {  
+        http.Error(w, "Could not retrieve locations: "+err.Error(), http.StatusInternalServerError)  
+        return  
+    }  
+
+    // Return the locations as JSON  
+    w.Header().Set("Content-Type", "application/json")  
+    json.NewEncoder(w).Encode(locations)  
+}
 // GetAllLocation handles the retrieval of all locations
 func GetAllLocation(w http.ResponseWriter, r *http.Request) {    
 	// Set CORS headers    

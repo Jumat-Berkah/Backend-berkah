@@ -10,11 +10,13 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/whatsauth/itmodel v0.0.8
 	golang.org/x/crypto v0.31.0
+	golang.org/x/oauth2 v0.25.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect

@@ -5,10 +5,12 @@ import (
 	"Backend-berkah/helper"
 	"Backend-berkah/model"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/oauth2"
 )
 
 func Register(w http.ResponseWriter, r *http.Request) {
@@ -134,6 +136,42 @@ func Login(w http.ResponseWriter, r *http.Request) {
             "role": role.Name, // Include the role name
         },
     })
+}
+
+func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
+    url := config.GoogleOauthConfig.AuthCodeURL(config.OauthStateString, oauth2.AccessTypeOffline)
+    http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+    state := r.FormValue("state")
+    if state != config.OauthStateString {
+        fmt.Fprintf(w, "invalid oauth state")
+        return
+    }
+
+    code := r.FormValue("code")
+    token, err := config.GoogleOauthConfig.Exchange(oauth2.NoContext, code)
+    if err != nil {
+        fmt.Fprintf(w, "code exchange wrong: %s", err.Error())
+        return
+    }
+
+    response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+    if err != nil {
+        fmt.Fprintf(w, "failed getting user info: %s", err.Error())
+        return
+    }
+    defer response.Body.Close()
+
+    var userInfo map[string]interface{}
+    err = json.NewDecoder(response.Body).Decode(&userInfo)
+    if err != nil {
+        fmt.Fprintf(w, "failed decoding user info: %s", err.Error())
+        return
+    }
+
+    fmt.Fprintf(w, "Hello, %s!", userInfo["name"])
 }
 
 
