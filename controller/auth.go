@@ -157,7 +157,8 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+    response, err := http.Get("https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses&access_token=" + token.AccessToken)
+
     if err != nil {
         fmt.Fprintf(w, "failed getting user info: %s", err.Error())
         return
