@@ -4,6 +4,7 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/helper"
 	"Backend-berkah/model"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -146,12 +147,12 @@ func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
 func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     state := r.FormValue("state")
     if state != config.OauthStateString {
-        fmt.Fprintf(w, "invalid oauth state")
+        fmt.Fprintf(w, "invalid oauth state") 
         return
     }
 
     code := r.FormValue("code")
-    token, err := config.GoogleOauthConfig.Exchange(oauth2.NoContext, code)
+    token, err := config.GoogleOauthConfig.Exchange(context.Background(), code)
     if err != nil {
         fmt.Fprintf(w, "code exchange wrong: %s", err.Error())
         return

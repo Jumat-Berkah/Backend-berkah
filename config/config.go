@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"log"
 	"os"
 
@@ -24,8 +26,15 @@ var (
         Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
         Endpoint:     google.Endpoint,
     }
-    OauthStateString = "random-state"
+    OauthStateString = GenerateStateString()
 )
+
+// Fungsi untuk menghasilkan state string yang aman
+func GenerateStateString() string {
+    b := make([]byte, 16)
+    rand.Read(b)
+    return base64.URLEncoding.EncodeToString(b)
+}
 
 // LoadEnv loads environment variables and initializes JwtKey
 func LoadEnv() {
