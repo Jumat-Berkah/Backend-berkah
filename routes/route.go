@@ -50,7 +50,10 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.UpdateLocation(w, r)
     case method == "DELETE" && path == "/deletelocation":
         controller.DeleteLocation(w, r)	
-
+    case method == "PUT" && path == "/updateuser":
+        controller.UpdateUser(w, r)
+    case method == "DELETE" && path == "/deleteuser":
+        controller.DeleteUser(w, r)
     // Default route
     default:
         helper.NotFound(w, r)
