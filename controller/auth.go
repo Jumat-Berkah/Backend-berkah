@@ -215,7 +215,7 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         user = model.User{
             Email:    googleUser.Email,
             Username: googleUser.Name,
-            RoleID:   2, // Role user biasa
+            RoleID:   1, // Role user biasa
         }
         
         if err := config.DB.Create(&user).Error; err != nil {
@@ -224,17 +224,24 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-    // Generate JWT token
-    jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
-    if err != nil {
-        http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
-
-    // Redirect ke frontend dengan token
-    redirectURL := fmt.Sprintf("https://jumatberkah.vercel.app/auth/success?token=%s", jwtToken)
-    http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
-}
+     // Generate JWT token
+     jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
+     if err != nil {
+         http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+         return
+     }
+ 
+     // Tentukan redirect URL berdasarkan role
+     var redirectURL string
+     if user.Role.Name == "admin" {
+         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/admin/admin.html?token=%s", jwtToken)
+     } else {
+         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", jwtToken)
+     }
+ 
+     // Redirect ke homepage
+     http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+ }
 
 
 
