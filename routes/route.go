@@ -41,9 +41,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
 
     // Admin route untuk manage CRUD
 	case method == "GET" && path == "/retreive/data/location":
-		controller.GetLocation(w, r)	
-    case method == "GET" && path == "/getlocation":
-        controller.GetAllLocation(w, r)
+		controller.GetLocation(w, r)
     case method == "POST" && path == "/createlocation":
         controller.CreateLocation(w, r)
     case method == "PUT" && path == "/updatelocation":
