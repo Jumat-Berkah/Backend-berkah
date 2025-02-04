@@ -1,21 +1,21 @@
-package config  
+package config
+
+import "net/http"
+
+
   
-import "net/http"  
-  
-// SetAccessControlHeaders handles CORS for preflight and main requests  
 func SetAccessControlHeaders(w http.ResponseWriter, r *http.Request) bool {  
-	// Set CORS headers for all requests  
-	w.Header().Set("Access-Control-Allow-Origin", "jumatberkah.vercel.app") // Pastikan ini sesuai dengan domain Anda  
-	w.Header().Set("Access-Control-Allow-Credentials", "true")  
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS")  
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Login, X-Requested-With")  
+    // Set CORS headers untuk semua request
+    w.Header().Set("Access-Control-Allow-Origin", "https://jumatberkah.vercel.app") // Tambahkan https://
+    w.Header().Set("Access-Control-Allow-Credentials", "true")  
+    w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS")  
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Login, X-Requested-With")  
   
-	// Handle preflight request  
-	if r.Method == http.MethodOptions {  
-		w.WriteHeader(http.StatusNoContent)  
-		return true  
-	}  
+    // Handle preflight request  
+    if r.Method == http.MethodOptions {  
+        w.WriteHeader(http.StatusNoContent)  
+        return true  
+    }  
   
-	// Handle main request  
-	return false  
-}  
+    return false  
+}
