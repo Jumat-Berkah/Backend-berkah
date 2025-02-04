@@ -4,14 +4,13 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/helper"
 	"Backend-berkah/model"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/oauth2"
 )
 
 func Register(w http.ResponseWriter, r *http.Request) {
@@ -140,40 +139,101 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
-    url := config.GoogleOauthConfig.AuthCodeURL(config.OauthStateString, oauth2.AccessTypeOffline)
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    // Generate state string untuk keamanan
+    state := config.GenerateStateString()
+    
+    // Simpan state ke session atau cookie
+    // Contoh menggunakan cookie:
+    http.SetCookie(w, &http.Cookie{
+        Name:     "oauthstate",
+        Value:    state,
+        Expires:  time.Now().Add(10 * time.Minute),
+        HttpOnly: true,
+        Secure:   true,
+        Path:     "/",
+        Domain:   "jumatberkah.vercel.app",
+    })
+
+    // Redirect ke halaman consent Google
+    url := config.GoogleOauthConfig.AuthCodeURL(state)
     http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
-    state := r.FormValue("state")
-    if state != config.OauthStateString {
-        fmt.Fprintf(w, "invalid oauth state") 
+    if config.SetAccessControlHeaders(w, r) {
         return
     }
 
-    code := r.FormValue("code")
-    token, err := config.GoogleOauthConfig.Exchange(context.Background(), code)
+    // Ambil state dari cookie
+    oauthCookie, err := r.Cookie("oauthstate")
     if err != nil {
-        fmt.Fprintf(w, "code exchange wrong: %s", err.Error())
+        http.Error(w, "State cookie not found", http.StatusBadRequest)
         return
     }
 
-    response, err := http.Get("https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses&access_token=" + token.AccessToken)
+    if r.FormValue("state") != oauthCookie.Value {
+        http.Error(w, "Invalid oauth state", http.StatusBadRequest)
+        return
+    }
 
+    // Exchange authorization code dengan token
+    token, err := config.GoogleOauthConfig.Exchange(r.Context(), r.FormValue("code"))
     if err != nil {
-        fmt.Fprintf(w, "failed getting user info: %s", err.Error())
+        http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    defer response.Body.Close()
 
-    var userInfo map[string]interface{}
-    err = json.NewDecoder(response.Body).Decode(&userInfo)
+    // Ambil info user dari Google
+    client := config.GoogleOauthConfig.Client(r.Context(), token)
+    userInfo, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
     if err != nil {
-        fmt.Fprintf(w, "failed decoding user info: %s", err.Error())
+        http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer userInfo.Body.Close()
+
+    var googleUser struct {
+        Email string `json:"email"`
+        Name  string `json:"name"`
+    }
+
+    if err := json.NewDecoder(userInfo.Body).Decode(&googleUser); err != nil {
+        http.Error(w, "Failed to decode user info: "+err.Error(), http.StatusInternalServerError)
         return
     }
 
-    fmt.Fprintf(w, "Hello, %s!", userInfo["name"])
+    // Cek apakah user sudah ada di database
+    var user model.User
+    result := config.DB.Where("email = ?", googleUser.Email).First(&user)
+    
+    if result.Error != nil {
+        // Jika user belum ada, buat user baru
+        user = model.User{
+            Email:    googleUser.Email,
+            Username: googleUser.Name,
+            RoleID:   2, // Role user biasa
+        }
+        
+        if err := config.DB.Create(&user).Error; err != nil {
+            http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
+    }
+
+    // Generate JWT token
+    jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
+    if err != nil {
+        http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    // Redirect ke frontend dengan token
+    redirectURL := fmt.Sprintf("https://jumatberkah.vercel.app/auth/success?token=%s", jwtToken)
+    http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 
