@@ -294,7 +294,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
 }
-
+// profile 
 func UpdateProfile(w http.ResponseWriter, r *http.Request) {
     if config.SetAccessControlHeaders(w, r) {
         return

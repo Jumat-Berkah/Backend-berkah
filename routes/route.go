@@ -38,7 +38,11 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.HandleGoogleLogin(w, r) // Menangani login dengan Google
     case method == "GET" && path == "/auth/callback":
         controller.HandleGoogleCallback(w, r) // Menangani callback dari Google
-
+    
+    //profile update
+    case method == "PUT" && path == "/updateprofile":
+        controller.UpdateProfile(w, r)
+        
     // Admin route untuk manage CRUD
 	case method == "GET" && path == "/retreive/data/location":
 		controller.GetLocation(w, r)
