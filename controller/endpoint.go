@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // GetLocation handles GET requests to retrieve locations
@@ -291,4 +293,58 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
     // Return success response
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
+}
+
+func UpdateProfile(w http.ResponseWriter, r *http.Request) {
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+
+    var updatedProfile model.UpdatedProfile
+
+    if err := json.NewDecoder(r.Body).Decode(&updatedProfile); err != nil {
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+
+    var user model.User
+    if err := config.DB.First(&user, updatedProfile.UserID).Error; err != nil {
+        http.Error(w, "User not found", http.StatusNotFound)
+        return
+    }
+
+    // Update user fields
+    user.Username = updatedProfile.Username
+    user.Email = updatedProfile.Email
+    user.FullName = updatedProfile.FullName
+    user.PhoneNumber = updatedProfile.PhoneNumber
+    user.Address = updatedProfile.Address
+    user.PreferredMasjid = updatedProfile.PreferredMasjid
+    user.Bio = updatedProfile.Bio
+
+    // Handle password update if provided
+    if updatedProfile.OldPassword != "" && updatedProfile.NewPassword != "" {
+        if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(updatedProfile.OldPassword)); err != nil {
+            http.Error(w, "Password lama tidak sesuai", http.StatusUnauthorized)
+            return
+        }
+
+        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updatedProfile.NewPassword), bcrypt.DefaultCost)
+        if err != nil {
+            http.Error(w, "Gagal mengenkripsi password", http.StatusInternalServerError)
+            return
+        }
+        user.Password = string(hashedPassword)
+    }
+
+    if err := config.DB.Save(&user).Error; err != nil {
+        http.Error(w, "Gagal memperbarui profil", http.StatusInternalServerError)
+        return
+    }
+
+    json.NewEncoder(w).Encode(map[string]string{
+        "message": "Profil berhasil diperbarui",
+    })
 }

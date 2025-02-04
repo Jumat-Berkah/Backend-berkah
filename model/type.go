@@ -43,18 +43,6 @@ type Token struct {
 	ExpiresAt time.Time `gorm:"not null"`       // Token Expiry Time  
 }  
 
-// Feedback model  
-type Feedback struct {  
-	ID          uint      `json:"id" gorm:"primaryKey"`    
-	UserID      uint      `json:"user_id"`    
-	Rating      int       `json:"rating"`    
-	Name        string    `json:"name"`    
-	Address     string    `json:"address"`    
-	Description *string    `json:"description,omitempty"`    
-	Comment     *string    `json:"comment,omitempty"`    
-	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"` // Waktu dibuat  
-}
-
 type Claims struct {  
 	UserID    uint      `json:"user_id"`    // ID pengguna  
 	Role      string    `json:"role"`       // Nama role pengguna  
