@@ -166,8 +166,17 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
     // Set content type to JSON
     w.Header().Set("Content-Type", "application/json")
 
-    // Retrieve users from database with their roles
-    var users []struct {
+    var users []model.User
+
+    // Query users with their roles using Preload
+    if err := config.DB.Preload("Role").Find(&users).Error; err != nil {
+        log.Printf("Failed to retrieve users: %v", err)
+        http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
+        return
+    }
+
+    // Create response structure that only includes needed fields
+    type UserResponse struct {
         ID       uint   `json:"id"`
         Username string `json:"username"`
         Email    string `json:"email"`
@@ -176,19 +185,25 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
         } `json:"role"`
     }
 
-    // Query users with their roles using joins
-    if err := config.DB.Model(&model.User{}).
-        Select("users.id, users.username, users.email, roles.name as role_name").
-        Joins("left join roles on users.role_id = roles.id").
-        Scan(&users).Error; err != nil {
-        log.Printf("Failed to retrieve users: %v", err)
-        http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
-        return
+    // Convert users to response format
+    var response []UserResponse
+    for _, user := range users {
+        userResp := UserResponse{
+            ID:       user.ID,
+            Username: user.Username,
+            Email:    user.Email,
+            Role: struct {
+                Name string `json:"name"`
+            }{
+                Name: user.Role.Name,
+            },
+        }
+        response = append(response, userResp)
     }
 
     // Return the users as JSON
     w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(users)
+    json.NewEncoder(w).Encode(response)
 }
 
 // UpdateUser handles PUT requests to update existing user data
