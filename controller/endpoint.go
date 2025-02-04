@@ -200,6 +200,65 @@ func DeleteLocation(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"message": "Location deleted successfully"})  
 }
 
+// manage user
+// GetUsers handles GET requests to retrieve all users
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+    // Set CORS headers
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    // Set content type to JSON
+    w.Header().Set("Content-Type", "application/json")
+
+    // Validate the token from the Authorization header
+    tokenString, err := helper.GetTokenFromHeader(r)
+    if err != nil {
+        log.Printf("Token error: %v", err)
+        http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+        return
+    }
+
+    // Check if the token is blacklisted
+    if helper.IsTokenBlacklisted(tokenString) {
+        log.Printf("Token is blacklisted: %v", tokenString)
+        http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)
+        return
+    }
+
+    // Verify the JWT token
+    claims := &model.Claims{}
+    if err := helper.ParseAndValidateToken(tokenString, claims); err != nil {
+        log.Printf("Token validation error: %v", err)
+        http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+        return
+    }
+
+    // Retrieve users from database with their roles
+    var users []struct {
+        ID       uint   `json:"id"`
+        Username string `json:"username"`
+        Email    string `json:"email"`
+        Role     struct {
+            Name string `json:"name"`
+        } `json:"role"`
+    }
+
+    // Query users with their roles using joins
+    if err := config.DB.Model(&model.User{}).
+        Select("users.id, users.username, users.email, roles.name as role_name").
+        Joins("left join roles on users.role_id = roles.id").
+        Scan(&users).Error; err != nil {
+        log.Printf("Failed to retrieve users: %v", err)
+        http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
+        return
+    }
+
+    // Return the users as JSON
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(users)
+}
+
 // UpdateUser handles PUT requests to update existing user data
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
     // Set CORS headers

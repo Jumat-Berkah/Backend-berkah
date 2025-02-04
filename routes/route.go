@@ -40,7 +40,7 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.HandleGoogleCallback(w, r) // Menangani callback dari Google
 
     // Admin route untuk manage CRUD
-	case method == "GET" && path == "/retreive/data":
+	case method == "GET" && path == "/retreive/data/location":
 		controller.GetLocation(w, r)	
     case method == "GET" && path == "/getlocation":
         controller.GetAllLocation(w, r)
@@ -50,9 +50,12 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.UpdateLocation(w, r)
     case method == "DELETE" && path == "/deletelocation":
         controller.DeleteLocation(w, r)	
+    case method == "GET" && path == "/retreive/data/user":
+        controller.GetUsers(w, r)
     case method == "PUT" && path == "/updateuser":
         controller.UpdateUser(w, r)
     case method == "DELETE" && path == "/deleteuser":
+
         controller.DeleteUser(w, r)
     // Default route
     default:
