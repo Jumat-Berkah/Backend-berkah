@@ -176,30 +176,36 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
     var users []model.User
 
-    // Query users with their roles using Preload
+    // Query users dengan preload Role
     if err := config.DB.Preload("Role").Find(&users).Error; err != nil {
         log.Printf("Failed to retrieve users: %v", err)
         http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
         return
     }
 
-    // Create response structure that only includes needed fields
+    // Buat response structure yang sesuai dengan kebutuhan frontend
     type UserResponse struct {
-        ID       uint   `json:"id"`
-        Username string `json:"username"`
-        Email    string `json:"email"`
-        Role     struct {
+        ID              uint   `json:"id"`
+        Username        string `json:"username"`
+        Email           string `json:"email"`
+        Bio            string `json:"bio"`
+        PreferredMasjid string `json:"preferred_masjid"`
+        ProfilePicture  string `json:"profile_picture"`
+        Role           struct {
             Name string `json:"name"`
         } `json:"role"`
     }
 
-    // Convert users to response format
+    // Convert users ke response format
     var response []UserResponse
     for _, user := range users {
         userResp := UserResponse{
-            ID:       user.ID,
-            Username: user.Username,
-            Email:    user.Email,
+            ID:              user.ID,
+            Username:        user.Username,
+            Email:           user.Email,
+            Bio:            user.Bio,
+            PreferredMasjid: user.PreferredMasjid,
+            ProfilePicture:  user.ProfilePicture,
             Role: struct {
                 Name string `json:"name"`
             }{
