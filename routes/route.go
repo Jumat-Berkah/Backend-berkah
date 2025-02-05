@@ -58,8 +58,15 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.UpdateUser(w, r)
     case method == "DELETE" && path == "/deleteuser":
 
+    //profile picture
+    case method == "POST" && path == "/upload/profile-picture":
+        controller.UploadProfilePicture(w, r)
+    case method == "GET" && path == "/profile-picture":
+        controller.ServeProfilePicture(w, r)
+
         controller.DeleteUser(w, r)
     // Default route
+
     default:
         helper.NotFound(w, r)
     }

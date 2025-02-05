@@ -4,8 +4,14 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/model"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -347,4 +353,121 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{
         "message": "Profil berhasil diperbarui",
     })
+}
+
+// upload gambarrr
+const (
+    MaxFileSize    = 20 * 1024 * 1024 // 20MB in bytes
+    UploadDir      = "./uploads/profile-pictures"
+    AllowedTypes   = ".jpg,.jpeg,.png,.gif"
+)
+
+func UploadProfilePicture(w http.ResponseWriter, r *http.Request) {
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    // Set response header
+    w.Header().Set("Content-Type", "application/json")
+
+    // Parse multipart form dengan maksimal ukuran 20MB
+    if err := r.ParseMultipartForm(MaxFileSize); err != nil {
+        http.Error(w, "File terlalu besar. Maksimal 20MB", http.StatusBadRequest)
+        return
+    }
+
+    // Ambil file dari form
+    file, header, err := r.FormFile("profile_picture")
+    if err != nil {
+        http.Error(w, "Gagal mengambil file", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+
+    // Validasi ukuran file
+    if header.Size > MaxFileSize {
+        http.Error(w, "Ukuran file melebihi 20MB", http.StatusBadRequest)
+        return
+    }
+
+    // Validasi tipe file
+    ext := strings.ToLower(filepath.Ext(header.Filename))
+    if !strings.Contains(AllowedTypes, ext) {
+        http.Error(w, "Tipe file tidak diizinkan. Gunakan: "+AllowedTypes, http.StatusBadRequest)
+        return
+    }
+
+    // Ambil user ID dari form
+    userID := r.FormValue("user_id")
+    if userID == "" {
+        http.Error(w, "User ID diperlukan", http.StatusBadRequest)
+        return
+    }
+
+    // Buat direktori jika belum ada
+    if err := os.MkdirAll(UploadDir, 0755); err != nil {
+        http.Error(w, "Gagal membuat direktori upload", http.StatusInternalServerError)
+        return
+    }
+
+    // Generate nama file unik
+    filename := fmt.Sprintf("%s_%d%s", userID, time.Now().UnixNano(), ext)
+    filepath := filepath.Join(UploadDir, filename)
+
+    // Buat file baru
+    dst, err := os.Create(filepath)
+    if err != nil {
+        http.Error(w, "Gagal membuat file", http.StatusInternalServerError)
+        return
+    }
+    defer dst.Close()
+
+    // Copy file ke tujuan
+    if _, err := io.Copy(dst, file); err != nil {
+        http.Error(w, "Gagal menyimpan file", http.StatusInternalServerError)
+        return
+    }
+
+    // Update URL gambar di database
+    var user model.User
+    if err := config.DB.First(&user, userID).Error; err != nil {
+        http.Error(w, "User tidak ditemukan", http.StatusNotFound)
+        return
+    }
+
+    // Generate URL untuk akses gambar
+    imageURL := fmt.Sprintf("/uploads/profile-pictures/%s", filename)
+    
+    // Update profile_picture di database
+    if err := config.DB.Model(&user).Update("profile_picture", imageURL).Error; err != nil {
+        http.Error(w, "Gagal memperbarui database", http.StatusInternalServerError)
+        return
+    }
+
+    // Kirim response sukses
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{
+        "message": "Foto profil berhasil diupload",
+        "url": imageURL,
+    })
+}
+
+// Fungsi untuk serve file statis
+func ServeProfilePicture(w http.ResponseWriter, r *http.Request) {
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    // Ambil nama file dari URL
+    filename := filepath.Base(r.URL.Path)
+    filepath := filepath.Join(UploadDir, filename)
+
+    // Cek apakah file ada
+    if _, err := os.Stat(filepath); os.IsNotExist(err) {
+        http.Error(w, "File tidak ditemukan", http.StatusNotFound)
+        return
+    }
+
+    // Serve file
+    http.ServeFile(w, r, filepath)
 }
