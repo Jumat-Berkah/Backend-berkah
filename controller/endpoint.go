@@ -176,22 +176,27 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
     var users []model.User
 
-    // Query users dengan preload Role
+    // Query users dengan preload Role dan semua field yang diperlukan
     if err := config.DB.Preload("Role").Find(&users).Error; err != nil {
         log.Printf("Failed to retrieve users: %v", err)
         http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
         return
     }
 
-    // Buat response structure yang sesuai dengan kebutuhan frontend
+    // Buat response structure yang lengkap sesuai model User
     type UserResponse struct {
-        ID              uint   `json:"id"`
-        Username        string `json:"username"`
-        Email           string `json:"email"`
-        Bio            string `json:"bio"`
-        PreferredMasjid string `json:"preferred_masjid"`
-        ProfilePicture  string `json:"profile_picture"`
+        ID              uint      `json:"id"`
+        Username        string    `json:"username"`
+        Email           string    `json:"email"`
+        FullName        string    `json:"full_name"`
+        PhoneNumber     string    `json:"phone_number"`
+        Address         string    `json:"address"`
+        ProfilePicture  string    `json:"profile_picture"`
+        PreferredMasjid string    `json:"preferred_masjid"`
+        Bio            string    `json:"bio"`
+        JoinDate       time.Time `json:"join_date"`
         Role           struct {
+            ID   uint   `json:"id"`
             Name string `json:"name"`
         } `json:"role"`
     }
@@ -199,16 +204,28 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
     // Convert users ke response format
     var response []UserResponse
     for _, user := range users {
+        // Pastikan URL profile picture lengkap
+        profilePicture := user.ProfilePicture
+        if profilePicture != "" && !strings.HasPrefix(profilePicture, "http") {
+            profilePicture = fmt.Sprintf("/uploads/profile-pictures/%s", profilePicture)
+        }
+
         userResp := UserResponse{
             ID:              user.ID,
             Username:        user.Username,
             Email:           user.Email,
-            Bio:            user.Bio,
+            FullName:        user.FullName,
+            PhoneNumber:     user.PhoneNumber,
+            Address:         user.Address,
+            ProfilePicture:  profilePicture,
             PreferredMasjid: user.PreferredMasjid,
-            ProfilePicture:  user.ProfilePicture,
+            Bio:            user.Bio,
+            JoinDate:       user.JoinDate,
             Role: struct {
+                ID   uint   `json:"id"`
                 Name string `json:"name"`
             }{
+                ID:   user.Role.ID,
                 Name: user.Role.Name,
             },
         }
@@ -312,53 +329,172 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    // Parse multipart form untuk menangani file upload
+    if err := r.ParseMultipartForm(20 * 1024 * 1024); err != nil { // 20MB max
+        http.Error(w, "Gagal memproses form", http.StatusBadRequest)
+        return
+    }
+
     w.Header().Set("Content-Type", "application/json")
 
-    var updatedProfile model.UpdatedProfile
-
-    if err := json.NewDecoder(r.Body).Decode(&updatedProfile); err != nil {
-        http.Error(w, "Invalid request body", http.StatusBadRequest)
+    // Ambil data profile dari form
+    userID := r.FormValue("user_id")
+    if userID == "" {
+        http.Error(w, "User ID diperlukan", http.StatusBadRequest)
         return
     }
 
+    // Ambil data user yang ada
     var user model.User
-    if err := config.DB.First(&user, updatedProfile.UserID).Error; err != nil {
-        http.Error(w, "User not found", http.StatusNotFound)
+    if err := config.DB.First(&user, userID).Error; err != nil {
+        http.Error(w, "User tidak ditemukan", http.StatusNotFound)
         return
     }
 
-    // Update user fields
-    user.Username = updatedProfile.Username
-    user.Email = updatedProfile.Email
-    user.FullName = updatedProfile.FullName
-    user.PhoneNumber = updatedProfile.PhoneNumber
-    user.Address = updatedProfile.Address
-    user.PreferredMasjid = updatedProfile.PreferredMasjid
-    user.Bio = updatedProfile.Bio
+    // Update fields dasar
+    updates := map[string]interface{}{
+        "username":         r.FormValue("username"),
+        "email":           r.FormValue("email"),
+        "full_name":       r.FormValue("full_name"),
+        "phone_number":    r.FormValue("phone_number"),
+        "address":         r.FormValue("address"),
+        "preferred_masjid": r.FormValue("preferred_masjid"),
+        "bio":             r.FormValue("bio"),
+    }
 
-    // Handle password update if provided
-    if updatedProfile.OldPassword != "" && updatedProfile.NewPassword != "" {
-        if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(updatedProfile.OldPassword)); err != nil {
+    // Handle profile picture jika ada
+    file, header, err := r.FormFile("profile_picture")
+    if err == nil { // Jika ada file yang diupload
+        defer file.Close()
+
+        // Validasi tipe file
+        if !strings.HasPrefix(header.Header.Get("Content-Type"), "image/") {
+            http.Error(w, "File harus berupa gambar", http.StatusBadRequest)
+            return
+        }
+
+        // Validasi ukuran file (max 20MB)
+        if header.Size > 20*1024*1024 {
+            http.Error(w, "Ukuran file terlalu besar (max 20MB)", http.StatusBadRequest)
+            return
+        }
+
+        // Generate nama file unik
+        ext := filepath.Ext(header.Filename)
+        filename := fmt.Sprintf("%s_%d%s", userID, time.Now().UnixNano(), ext)
+        uploadPath := filepath.Join("uploads/profile-pictures", filename)
+
+        // Buat direktori jika belum ada
+        if err := os.MkdirAll("uploads/profile-pictures", 0755); err != nil {
+            log.Printf("Error creating directory: %v", err)
+            http.Error(w, "Gagal menyimpan file", http.StatusInternalServerError)
+            return
+        }
+
+        // Buat file baru
+        dst, err := os.Create(uploadPath)
+        if err != nil {
+            log.Printf("Error creating file: %v", err)
+            http.Error(w, "Gagal menyimpan file", http.StatusInternalServerError)
+            return
+        }
+        defer dst.Close()
+
+        // Copy file ke tujuan
+        if _, err := io.Copy(dst, file); err != nil {
+            log.Printf("Error copying file: %v", err)
+            http.Error(w, "Gagal menyimpan file", http.StatusInternalServerError)
+            return
+        }
+
+        // Hapus file lama jika ada
+        if user.ProfilePicture != "" {
+            oldPath := filepath.Join(".", user.ProfilePicture)
+            if err := os.Remove(oldPath); err != nil {
+                log.Printf("Error removing old profile picture: %v", err)
+            }
+        }
+
+        // Update path gambar di database
+        updates["profile_picture"] = "/" + uploadPath
+    }
+
+    // Handle password update jika ada
+    oldPassword := r.FormValue("old_password")
+    newPassword := r.FormValue("new_password")
+    if oldPassword != "" && newPassword != "" {
+        if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
             http.Error(w, "Password lama tidak sesuai", http.StatusUnauthorized)
             return
         }
 
-        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updatedProfile.NewPassword), bcrypt.DefaultCost)
+        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
         if err != nil {
-            http.Error(w, "Gagal mengenkripsi password", http.StatusInternalServerError)
+            log.Printf("Error hashing password: %v", err)
+            http.Error(w, "Gagal memproses password baru", http.StatusInternalServerError)
             return
         }
-        user.Password = string(hashedPassword)
+
+        updates["password"] = string(hashedPassword)
     }
 
-    if err := config.DB.Save(&user).Error; err != nil {
+    // Lakukan update ke database
+    result := config.DB.Model(&user).Updates(updates)
+    if result.Error != nil {
+        log.Printf("Error updating user: %v", result.Error)
         http.Error(w, "Gagal memperbarui profil", http.StatusInternalServerError)
         return
     }
 
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "Profil berhasil diperbarui",
-    })
+    // Ambil data user yang sudah diupdate
+    var updatedUser model.User
+    if err := config.DB.First(&updatedUser, userID).Error; err != nil {
+        log.Printf("Error fetching updated user: %v", err)
+        http.Error(w, "Gagal mengambil data user terbaru", http.StatusInternalServerError)
+        return
+    }
+
+    // Format response
+    response := struct {
+        Message string `json:"message"`
+        User    struct {
+            ID              uint   `json:"id"`
+            Username        string `json:"username"`
+            Email           string `json:"email"`
+            FullName        string `json:"full_name"`
+            PhoneNumber     string `json:"phone_number"`
+            Address         string `json:"address"`
+            PreferredMasjid string `json:"preferred_masjid"`
+            Bio            string `json:"bio"`
+            ProfilePicture  string `json:"profile_picture"`
+        } `json:"user"`
+    }{
+        Message: "Profil berhasil diperbarui",
+        User: struct {
+            ID              uint   `json:"id"`
+            Username        string `json:"username"`
+            Email           string `json:"email"`
+            FullName        string `json:"full_name"`
+            PhoneNumber     string `json:"phone_number"`
+            Address         string `json:"address"`
+            PreferredMasjid string `json:"preferred_masjid"`
+            Bio            string `json:"bio"`
+            ProfilePicture  string `json:"profile_picture"`
+        }{
+            ID:              updatedUser.ID,
+            Username:        updatedUser.Username,
+            Email:           updatedUser.Email,
+            FullName:        updatedUser.FullName,
+            PhoneNumber:     updatedUser.PhoneNumber,
+            Address:         updatedUser.Address,
+            PreferredMasjid: updatedUser.PreferredMasjid,
+            Bio:            updatedUser.Bio,
+            ProfilePicture:  updatedUser.ProfilePicture,
+        },
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(response)
 }
 
 // upload gambarrr
