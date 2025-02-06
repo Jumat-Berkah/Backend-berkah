@@ -357,19 +357,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
     // Set header
     w.Header().Set("Content-Type", "application/json")
     
-    // Ambil token dari header
-    authHeader := r.Header.Get("Authorization")
-    if authHeader == "" {
-        helper.WriteResponse(w, http.StatusBadRequest, map[string]interface{}{
-            "error": "No token provided",
-        })
-        return
-    }
-
-    // Hapus token dari whitelist atau invalidate token jika menggunakan sistem seperti itu
-    // Untuk kasus sederhana, client side akan menghapus token
-
-    // Update last_logout di database jika diperlukan
+    // Untuk Auth0, kita hanya perlu menangani cleanup di database
     userID := r.Context().Value("userID").(uint)
     if err := config.DB.Model(&model.User{}).Where("id = ?", userID).
         Update("last_logout", time.Now()).Error; err != nil {
