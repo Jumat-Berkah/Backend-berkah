@@ -5,19 +5,18 @@ go 1.22.3
 toolchain go1.22.10
 
 require (
-	github.com/auth0-community/go-auth0 v1.0.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/joho/godotenv v1.5.1
 	github.com/whatsauth/itmodel v0.0.8
 	golang.org/x/crypto v0.31.0
-	gopkg.in/square/go-jose.v2 v2.6.0
+	golang.org/x/oauth2 v0.26.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 )
 
 require (
-	github.com/google/go-cmp v0.5.9 // indirect
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
