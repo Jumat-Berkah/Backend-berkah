@@ -62,10 +62,17 @@ func URL(w http.ResponseWriter, r *http.Request) {
     case method == "POST" && path == "/upload/profile-picture":
         controller.UploadProfilePicture(w, r)
     case method == "GET" && path == "/profile-picture":
-        controller.ServeProfilePicture(w, r)    
+        controller.ServeProfilePicture(w, r)
+        
+    //reset password
+    case method == "POST" && path == "/reset-password":
+        controller.ResetPassword(w, r)
+    case method == "POST" && path == "/update-password":
+        controller.UpdatePassword(w, r)
     // Default route
 
     default:
         helper.NotFound(w, r)
+
     }
 }

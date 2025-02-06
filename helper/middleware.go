@@ -4,7 +4,9 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/model"
 	"context"
+	"crypto/rand"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -281,4 +283,11 @@ func StoreActiveToken(tokenString string, userID uint, expiresAt time.Time) erro
 		CreatedAt: time.Now(),
 	}
 	return config.DB.Create(&activeToken).Error
+}
+
+// GenerateResetToken menghasilkan token acak untuk reset password
+func GenerateResetToken() string {
+    b := make([]byte, 32)
+    rand.Read(b)
+    return fmt.Sprintf("%x", b)
 }

@@ -243,6 +243,115 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
      http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
  }
 
+ // ResetPassword menangani permintaan reset password
+func ResetPassword(w http.ResponseWriter, r *http.Request) {
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    // Pastikan metode yang digunakan adalah POST
+    if r.Method != http.MethodPost {
+        http.Error(w, "Metode tidak diizinkan", http.StatusMethodNotAllowed)
+        return
+    }
+
+    // Decode request body
+    var resetRequest struct {
+        Email string `json:"email"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&resetRequest); err != nil {
+        http.Error(w, "Format request tidak valid", http.StatusBadRequest)
+        return
+    }
+
+    // Cari user berdasarkan email
+    var user model.User
+    if err := config.DB.Where("email = ?", resetRequest.Email).First(&user).Error; err != nil {
+        http.Error(w, "Email tidak ditemukan", http.StatusNotFound)
+        return
+    }
+
+    // Generate token reset password yang akan expired dalam 1 jam
+    resetToken := helper.GenerateResetToken()
+    expiryTime := time.Now().Add(1 * time.Hour)
+
+    // Simpan token dan waktu expired ke database
+    user.ResetToken = resetToken
+    user.ResetTokenExpiry = &expiryTime
+
+    if err := config.DB.Save(&user).Error; err != nil {
+        http.Error(w, "Gagal menyimpan token reset", http.StatusInternalServerError)
+        return
+    }
+
+    // Kirim response
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{
+        "message": "Link reset password telah dikirim ke email Anda",
+        "token": resetToken,
+    })
+}
+
+// UpdatePassword menangani pembaruan password setelah reset
+func UpdatePassword(w http.ResponseWriter, r *http.Request) {
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
+
+    if r.Method != http.MethodPost {
+        http.Error(w, "Metode tidak diizinkan", http.StatusMethodNotAllowed)
+        return
+    }
+
+    var updateRequest model.UpdatePasswordRequest
+
+    if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
+        http.Error(w, "Format request tidak valid", http.StatusBadRequest)
+        return
+    }
+
+    // Validasi password baru
+    if len(updateRequest.NewPassword) < 6 {
+        http.Error(w, "Password harus minimal 6 karakter", http.StatusBadRequest)
+        return
+    }
+
+    // Cari user berdasarkan token reset
+    var user model.User
+    if err := config.DB.Where("reset_token = ?", updateRequest.Token).First(&user).Error; err != nil {
+        http.Error(w, "Token reset tidak valid", http.StatusBadRequest)
+        return
+    }
+
+    // Cek apakah token sudah expired
+    if user.ResetTokenExpiry == nil || time.Now().After(*user.ResetTokenExpiry) {
+        http.Error(w, "Token reset sudah expired", http.StatusBadRequest)
+        return
+    }
+
+    // Hash password baru
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updateRequest.NewPassword), bcrypt.DefaultCost)
+    if err != nil {
+        http.Error(w, "Gagal memproses password baru", http.StatusInternalServerError)
+        return
+    }
+
+    // Update password dan hapus token reset
+    user.Password = string(hashedPassword)
+    user.ResetToken = ""
+    user.ResetTokenExpiry = nil
+
+    if err := config.DB.Save(&user).Error; err != nil {
+        http.Error(w, "Gagal memperbarui password", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{
+        "message": "Password berhasil diperbarui",
+    })
+}
 
 
 
