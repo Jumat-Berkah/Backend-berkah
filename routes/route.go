@@ -32,6 +32,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.Register(w, r)
     case method == "POST" && path == "/login":
         controller.Login(w, r)
+    case method == "POST" && path == "/logout":
+        controller.Logout(w, r)
+
 
     // Google OAuth routes
     case method == "GET" && path == "/auth/google/login":
