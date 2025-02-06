@@ -196,9 +196,12 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     }
     defer userInfo.Body.Close()
 
+    // Setelah mendapatkan info user dari Google
     var googleUser struct {
-        Email string `json:"email"`
-        Name  string `json:"name"`
+        ID      string `json:"sub"`
+        Email   string `json:"email"`
+        Name    string `json:"name"`
+        Picture string `json:"picture"` // dari Google API
     }
 
     if err := json.NewDecoder(userInfo.Body).Decode(&googleUser); err != nil {
@@ -207,43 +210,49 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     }
 
     // Cek apakah user sudah ada di database
-    var user model.User
-    result := config.DB.Where("email = ?", googleUser.Email).First(&user)
+    var user model.GoogleUser
+    result := config.DB.Where("google_id = ? OR email = ?", googleUser.ID, googleUser.Email).First(&user)
     
     if result.Error != nil {
         // Jika user belum ada, buat user baru
-        user = model.User{
-            Email:    googleUser.Email,
-            Username: googleUser.Name,
-            RoleID:   1, // Role user biasa
+        user = model.GoogleUser{
+            GoogleID:   googleUser.ID,
+            Email:      googleUser.Email,
+            Name:       googleUser.Name,
+            PictureURL: googleUser.Picture, // sesuaikan dengan field di struct GoogleUser
+            RoleID:     1,
+            LastLogin:  time.Now(),
         }
         
         if err := config.DB.Create(&user).Error; err != nil {
             http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
             return
         }
+    } else {
+        // Update last login dan info user jika ada perubahan
+        user.LastLogin = time.Now()
+        user.Name = googleUser.Name
+        user.PictureURL = googleUser.Picture
+        
+        if err := config.DB.Save(&user).Error; err != nil {
+            http.Error(w, "Failed to update user: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
     }
 
-     // Generate JWT token
-     jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
-     if err != nil {
-         http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
-         return
-     }
- 
-     // Tentukan redirect URL berdasarkan role
-     var redirectURL string
-     if user.Role.Name == "admin" {
-         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/admin/admin.html?token=%s", jwtToken)
-     } else {
-         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", jwtToken)
-     }
- 
-     // Redirect ke homepage
-     http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
- }
+    // Generate JWT token
+    tokenString, err := helper.GenerateToken(user.ID, "user") // Langsung set role "user"
+    if err != nil {
+        http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
 
- // ResetPassword menangani permintaan reset password
+    // Redirect dengan token
+    redirectURL := fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", tokenString)
+    http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+}
+
+// ResetPassword menangani permintaan reset password
 func ResetPassword(w http.ResponseWriter, r *http.Request) {
     if config.SetAccessControlHeaders(w, r) {
         return
