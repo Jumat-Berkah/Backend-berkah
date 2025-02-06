@@ -145,26 +145,23 @@ func HandleAuth0Login(w http.ResponseWriter, r *http.Request) {
     }
 
     state := config.GenerateStateString()
-    
-    // Set cookie untuk state
+    // Set cookie untuk state verification
     http.SetCookie(w, &http.Cookie{
         Name:     "auth_state",
         Value:    state,
-        Expires:  time.Now().Add(10 * time.Minute),
+        MaxAge:   int(time.Hour.Seconds()),
         HttpOnly: true,
         Secure:   true,
         Path:     "/",
-        SameSite: http.SameSiteNoneMode,
-        Domain:   "backend-berkah.onrender.com",
     })
 
-    // Buat URL Auth0
+    // Redirect ke Auth0 untuk autentikasi
     authURL := fmt.Sprintf(
         "https://%s/authorize?"+
             "response_type=code&"+
             "client_id=%s&"+
             "redirect_uri=%s&"+
-            "scope=openid%%20profile%%20email&"+
+            "scope=openid profile email&"+
             "state=%s",
         config.Auth0Config.Domain,
         config.Auth0Config.ClientID,
@@ -172,7 +169,6 @@ func HandleAuth0Login(w http.ResponseWriter, r *http.Request) {
         state,
     )
 
-    log.Printf("Redirecting to Auth0 URL: %s", authURL)
     http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
