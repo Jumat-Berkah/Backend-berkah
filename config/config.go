@@ -43,7 +43,7 @@ var Auth0Config = struct {
 	ClientID:     os.Getenv("AUTH0_CLIENT_ID"),
 	ClientSecret: os.Getenv("AUTH0_CLIENT_SECRET"),
 	Audience:     "https://backend-berkah.onrender.com",
-	RedirectURL:  "https://jumatberkah.vercel.app/auth/callback",
+	RedirectURL:  "https://backend-berkah.onrender.com/auth/callback",
 }
 
 // Fungsi untuk menghasilkan state string yang aman
