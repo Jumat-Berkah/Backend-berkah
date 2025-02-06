@@ -6,7 +6,6 @@ func SetAccessControlHeaders(w http.ResponseWriter, r *http.Request) bool {
     // Izinkan multiple origins
     allowedOrigins := []string{
         "https://jumatberkah.vercel.app",
-        "https://dev-a5578emn1asaeic0.us.auth0.com",
         "https://backend-berkah.onrender.com",
     }
     
@@ -22,12 +21,10 @@ func SetAccessControlHeaders(w http.ResponseWriter, r *http.Request) bool {
     // Set header CORS lainnya
     w.Header().Set("Access-Control-Allow-Credentials", "true")
     w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept")
-    w.Header().Set("Access-Control-Max-Age", "3600")
-    w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Authorization")
+    w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
     
     // Handle preflight request
-    if r.Method == http.MethodOptions {
+    if r.Method == "OPTIONS" {
         w.WriteHeader(http.StatusNoContent)
         return true
     }
