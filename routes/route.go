@@ -32,15 +32,12 @@ func URL(w http.ResponseWriter, r *http.Request) {
         controller.Register(w, r)
     case method == "POST" && path == "/login":
         controller.Login(w, r)
-    case method == "POST" && path == "/logout":
-        controller.Logout(w, r)
-
 
     // Google OAuth routes
     case method == "GET" && path == "/auth/google/login":
-        controller.HandleAuth0Login(w, r)
+        controller.HandleGoogleLogin(w, r) // Menangani login dengan Google
     case method == "GET" && path == "/auth/callback":
-        controller.HandleAuth0Callback(w, r)
+        controller.HandleGoogleCallback(w, r) // Menangani callback dari Google
     
     //profile update
     case method == "PUT" && path == "/updateprofile":
@@ -65,17 +62,10 @@ func URL(w http.ResponseWriter, r *http.Request) {
     case method == "POST" && path == "/upload/profile-picture":
         controller.UploadProfilePicture(w, r)
     case method == "GET" && path == "/profile-picture":
-        controller.ServeProfilePicture(w, r)
-        
-    //reset password
-    case method == "POST" && path == "/reset-password":
-        controller.ResetPassword(w, r)
-    case method == "POST" && path == "/update-password":
-        controller.UpdatePassword(w, r)
+        controller.ServeProfilePicture(w, r)    
     // Default route
 
     default:
         helper.NotFound(w, r)
-
     }
 }

@@ -4,19 +4,15 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/model"
 	"context"
-	"crypto/rand"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/auth0-community/go-auth0"
 	"github.com/go-co-op/gocron"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/square/go-jose.v2"
 )
 
 // Middleware untuk memvalidasi role pengguna
@@ -107,55 +103,6 @@ func BlacklistToken(w http.ResponseWriter, r *http.Request) {
 	WriteResponse(w, http.StatusOK, map[string]string{
 		"message": "Logout successful, token has been blacklisted",
 	})
-}
-
-func ValidateAuth0Token(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Ambil token dari header Authorization
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			log.Printf("No token provided")
-			http.Error(w, "No token provided", http.StatusUnauthorized)
-			return
-		}
-		
-		// Validate token dengan Auth0
-		client := auth0.NewJWKClient(auth0.JWKClientOptions{
-			URI: fmt.Sprintf("https://%s/.well-known/jwks.json", config.Auth0Config.Domain),
-		}, nil)
-
-		configuration := auth0.NewConfiguration(client, []string{config.Auth0Config.Audience}, config.Auth0Config.Domain, jose.RS256)
-		validator := auth0.NewValidator(configuration, nil)
-
-		// Validate token
-		jwtToken, err := validator.ValidateRequest(r)
-		if err != nil {
-			log.Printf("Token validation error: %v", err)
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		// Extract claims dari token
-		claims := map[string]interface{}{}
-		err = jwtToken.Claims(&claims)
-		if err != nil {
-			log.Printf("Failed to extract claims: %v", err)
-			http.Error(w, "Failed to process token claims", http.StatusInternalServerError)
-			return
-		}
-
-		// Tambahkan userID dan role ke context
-		ctx := context.WithValue(r.Context(), config.UserIDKey, claims["sub"])
-		if role, ok := claims["https://jumatberkah.vercel.app/roles"].(string); ok {
-			ctx = context.WithValue(ctx, config.RoleKey, role)
-		}
-
-		// Log successful validation
-		log.Printf("Token validated successfully for user: %v", claims["sub"])
-
-		// Lanjutkan ke handler berikutnya dengan context yang diperbarui
-		next.ServeHTTP(w, r.WithContext(ctx))
-	}
 }
 
 // Middleware untuk memvalidasi token
@@ -334,11 +281,4 @@ func StoreActiveToken(tokenString string, userID uint, expiresAt time.Time) erro
 		CreatedAt: time.Now(),
 	}
 	return config.DB.Create(&activeToken).Error
-}
-
-// GenerateResetToken menghasilkan token acak untuk reset password
-func GenerateResetToken() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)
 }

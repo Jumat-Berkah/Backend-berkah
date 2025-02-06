@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -139,280 +138,111 @@ func Login(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-func HandleAuth0Login(w http.ResponseWriter, r *http.Request) {
+func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
     if config.SetAccessControlHeaders(w, r) {
         return
     }
 
+    // Generate state string untuk keamanan
     state := config.GenerateStateString()
-    // Set cookie untuk state verification
+    
+    // Simpan state ke session atau cookie
+    // Contoh menggunakan cookie:
     http.SetCookie(w, &http.Cookie{
-        Name:     "auth_state",
+        Name:     "oauthstate",
         Value:    state,
-        MaxAge:   int(time.Hour.Seconds()),
+        Expires:  time.Now().Add(10 * time.Minute),
         HttpOnly: true,
         Secure:   true,
         Path:     "/",
+        Domain:   "jumatberkah.vercel.app",
     })
 
-    // Redirect ke Auth0 untuk autentikasi
-    authURL := fmt.Sprintf(
-        "https://%s/authorize?"+
-            "response_type=code&"+
-            "client_id=%s&"+
-            "redirect_uri=%s&"+
-            "scope=openid profile email&"+
-            "state=%s",
-        config.Auth0Config.Domain,
-        config.Auth0Config.ClientID,
-        url.QueryEscape(config.Auth0Config.RedirectURL),
-        state,
-    )
-
-    http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+    // Redirect ke halaman consent Google
+    url := config.GoogleOauthConfig.AuthCodeURL(state)
+    http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func HandleAuth0Callback(w http.ResponseWriter, r *http.Request) {
+func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     if config.SetAccessControlHeaders(w, r) {
         return
     }
 
-    // Verifikasi state
-    stateCookie, err := r.Cookie("auth_state")
+    // Ambil state dari cookie
+    oauthCookie, err := r.Cookie("oauthstate")
     if err != nil {
-        log.Printf("Error getting state cookie: %v", err)
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=state_missing", http.StatusTemporaryRedirect)
+        http.Error(w, "State cookie not found", http.StatusBadRequest)
         return
     }
 
-    state := r.URL.Query().Get("state")
-    if state != stateCookie.Value {
-        log.Printf("Invalid state parameter")
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=invalid_state", http.StatusTemporaryRedirect)
+    if r.FormValue("state") != oauthCookie.Value {
+        http.Error(w, "Invalid oauth state", http.StatusBadRequest)
         return
     }
 
-    // Dapatkan code
-    code := r.URL.Query().Get("code")
-    if code == "" {
-        log.Printf("No code received")
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=no_code", http.StatusTemporaryRedirect)
-        return
-    }
-
-    // Exchange code untuk token
-    tokenURL := fmt.Sprintf("https://%s/oauth/token", config.Auth0Config.Domain)
-    tokenData := url.Values{}
-    tokenData.Set("grant_type", "authorization_code")
-    tokenData.Set("client_id", config.Auth0Config.ClientID)
-    tokenData.Set("client_secret", config.Auth0Config.ClientSecret)
-    tokenData.Set("code", code)
-    tokenData.Set("redirect_uri", config.Auth0Config.RedirectURL)
-
-    resp, err := http.PostForm(tokenURL, tokenData)
+    // Exchange authorization code dengan token
+    token, err := config.GoogleOauthConfig.Exchange(r.Context(), r.FormValue("code"))
     if err != nil {
-        log.Printf("Error exchanging code for token: %v", err)
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=token_exchange", http.StatusTemporaryRedirect)
-        return
-    }
-    defer resp.Body.Close()
-
-    var tokenResponse struct {
-        AccessToken string `json:"access_token"`
-        IDToken    string `json:"id_token"`
-    }
-
-    if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
-        log.Printf("Error decoding token response: %v", err)
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=token_decode", http.StatusTemporaryRedirect)
+        http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
         return
     }
 
-    // Dapatkan info user dari Auth0
-    userInfoURL := fmt.Sprintf("https://%s/userinfo", config.Auth0Config.Domain)
-    req, _ := http.NewRequest("GET", userInfoURL, nil)
-    req.Header.Add("Authorization", "Bearer "+tokenResponse.AccessToken)
-
-    client := &http.Client{}
-    userInfoResp, err := client.Do(req)
+    // Ambil info user dari Google
+    client := config.GoogleOauthConfig.Client(r.Context(), token)
+    userInfo, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
     if err != nil {
-        log.Printf("Error getting user info: %v", err)
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=userinfo", http.StatusTemporaryRedirect)
+        http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    defer userInfoResp.Body.Close()
+    defer userInfo.Body.Close()
 
-    var userInfo struct {
-        Email    string `json:"email"`
-        Name     string `json:"name"`
-        Picture  string `json:"picture"`
-        Sub      string `json:"sub"`
+    var googleUser struct {
+        Email string `json:"email"`
+        Name  string `json:"name"`
     }
 
-    if err := json.NewDecoder(userInfoResp.Body).Decode(&userInfo); err != nil {
-        log.Printf("Error decoding user info: %v", err)
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=userinfo_decode", http.StatusTemporaryRedirect)
+    if err := json.NewDecoder(userInfo.Body).Decode(&googleUser); err != nil {
+        http.Error(w, "Failed to decode user info: "+err.Error(), http.StatusInternalServerError)
         return
     }
 
-    // Simpan atau update user di database
+    // Cek apakah user sudah ada di database
     var user model.User
-    result := config.DB.Where("email = ?", userInfo.Email).First(&user)
+    result := config.DB.Where("email = ?", googleUser.Email).First(&user)
+    
     if result.Error != nil {
-        // Buat user baru
+        // Jika user belum ada, buat user baru
         user = model.User{
-            Email:    userInfo.Email,
-            Username: userInfo.Name,
-            RoleID:   1, // User biasa
+            Email:    googleUser.Email,
+            Username: googleUser.Name,
+            RoleID:   1, // Role user biasa
         }
+        
         if err := config.DB.Create(&user).Error; err != nil {
-            log.Printf("Error creating user: %v", err)
-            http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=db_error", http.StatusTemporaryRedirect)
+            http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
             return
         }
     }
 
-    // Generate JWT untuk aplikasi kita
-    token, err := helper.GenerateToken(user.ID, "user")
-    if err != nil {
-        log.Printf("Error generating token: %v", err)
-        http.Redirect(w, r, "https://jumatberkah.vercel.app/auth/login.html?error=jwt_error", http.StatusTemporaryRedirect)
-        return
-    }
+     // Generate JWT token
+     jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
+     if err != nil {
+         http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+         return
+     }
+ 
+     // Tentukan redirect URL berdasarkan role
+     var redirectURL string
+     if user.Role.Name == "admin" {
+         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/admin/admin.html?token=%s", jwtToken)
+     } else {
+         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", jwtToken)
+     }
+ 
+     // Redirect ke homepage
+     http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+ }
 
-    // Redirect ke frontend dengan token
-    redirectURL := fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", token)
-    http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
-}
-
-// ResetPassword menangani permintaan reset password
-func ResetPassword(w http.ResponseWriter, r *http.Request) {
-    if config.SetAccessControlHeaders(w, r) {
-        return
-    }
-
-    // Pastikan metode yang digunakan adalah POST
-    if r.Method != http.MethodPost {
-        http.Error(w, "Metode tidak diizinkan", http.StatusMethodNotAllowed)
-        return
-    }
-
-    // Decode request body
-    var resetRequest struct {
-        Email string `json:"email"`
-    }
-
-    if err := json.NewDecoder(r.Body).Decode(&resetRequest); err != nil {
-        http.Error(w, "Format request tidak valid", http.StatusBadRequest)
-        return
-    }
-
-    // Cari user berdasarkan email
-    var user model.User
-    if err := config.DB.Where("email = ?", resetRequest.Email).First(&user).Error; err != nil {
-        http.Error(w, "Email tidak ditemukan", http.StatusNotFound)
-        return
-    }
-
-    // Generate token reset password yang akan expired dalam 1 jam
-    resetToken := helper.GenerateResetToken()
-    expiryTime := time.Now().Add(1 * time.Hour)
-
-    // Simpan token dan waktu expired ke database
-    user.ResetToken = resetToken
-    user.ResetTokenExpiry = &expiryTime
-
-    if err := config.DB.Save(&user).Error; err != nil {
-        http.Error(w, "Gagal menyimpan token reset", http.StatusInternalServerError)
-        return
-    }
-
-    // Kirim response
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "Link reset password telah dikirim ke email Anda",
-        "token": resetToken,
-    })
-}
-
-// UpdatePassword menangani pembaruan password setelah reset
-func UpdatePassword(w http.ResponseWriter, r *http.Request) {
-    if config.SetAccessControlHeaders(w, r) {
-        return
-    }
-
-    if r.Method != http.MethodPost {
-        http.Error(w, "Metode tidak diizinkan", http.StatusMethodNotAllowed)
-        return
-    }
-
-    var updateRequest model.UpdatePasswordRequest
-
-    if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
-        http.Error(w, "Format request tidak valid", http.StatusBadRequest)
-        return
-    }
-
-    // Validasi password baru
-    if len(updateRequest.NewPassword) < 6 {
-        http.Error(w, "Password harus minimal 6 karakter", http.StatusBadRequest)
-        return
-    }
-
-    // Cari user berdasarkan token reset
-    var user model.User
-    if err := config.DB.Where("reset_token = ?", updateRequest.Token).First(&user).Error; err != nil {
-        http.Error(w, "Token reset tidak valid", http.StatusBadRequest)
-        return
-    }
-
-    // Cek apakah token sudah expired
-    if user.ResetTokenExpiry == nil || time.Now().After(*user.ResetTokenExpiry) {
-        http.Error(w, "Token reset sudah expired", http.StatusBadRequest)
-        return
-    }
-
-    // Hash password baru
-    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updateRequest.NewPassword), bcrypt.DefaultCost)
-    if err != nil {
-        http.Error(w, "Gagal memproses password baru", http.StatusInternalServerError)
-        return
-    }
-
-    // Update password dan hapus token reset
-    user.Password = string(hashedPassword)
-    user.ResetToken = ""
-    user.ResetTokenExpiry = nil
-
-    if err := config.DB.Save(&user).Error; err != nil {
-        http.Error(w, "Gagal memperbarui password", http.StatusInternalServerError)
-        return
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "Password berhasil diperbarui",
-    })
-}
-
-func Logout(w http.ResponseWriter, r *http.Request) {
-    // Set header
-    w.Header().Set("Content-Type", "application/json")
-    
-    // Untuk Auth0, kita hanya perlu menangani cleanup di database
-    userID := r.Context().Value("userID").(uint)
-    if err := config.DB.Model(&model.User{}).Where("id = ?", userID).
-        Update("last_logout", time.Now()).Error; err != nil {
-        helper.WriteResponse(w, http.StatusInternalServerError, map[string]interface{}{
-            "error": "Failed to update logout time",
-        })
-        return
-    }
-
-    helper.WriteResponse(w, http.StatusOK, map[string]interface{}{
-        "message": "Successfully logged out",
-    })
-}
 
 
 
