@@ -38,9 +38,9 @@ func URL(w http.ResponseWriter, r *http.Request) {
 
     // Google OAuth routes
     case method == "GET" && path == "/auth/google/login":
-        controller.HandleGoogleLogin(w, r) // Menangani login dengan Google
+        controller.HandleAuth0Login(w, r) // Menangani login dengan Google
     case method == "GET" && path == "/auth/callback":
-        controller.HandleGoogleCallback(w, r) // Menangani callback dari Google
+        controller.HandleAuth0Callback(w, r) // Menangani callback dari Google
     
     //profile update
     case method == "PUT" && path == "/updateprofile":

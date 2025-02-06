@@ -7,8 +7,6 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 // Key types untuk context values
@@ -34,27 +32,18 @@ func (c ContextKey) String() string {
 // JwtKey will hold the JWT secret key
 var JwtKey []byte
 
-var (
-	GoogleOauthConfig = oauth2.Config{
-		RedirectURL:  "https://jumatberkah.vercel.app/auth/callback",
-		ClientID:     os.Getenv("CLIENT_ID"),
-		ClientSecret: os.Getenv("CLIENT_SECRET"),
-		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
-		Endpoint:     google.Endpoint,
-	}
-	OauthStateString = GenerateStateString()
-)
-
 var Auth0Config = struct {
 	Domain       string
 	ClientID     string
 	ClientSecret string
 	Audience     string
+	RedirectURL  string
 }{
 	Domain:       os.Getenv("AUTH0_DOMAIN"),
 	ClientID:     os.Getenv("AUTH0_CLIENT_ID"),
 	ClientSecret: os.Getenv("AUTH0_CLIENT_SECRET"),
 	Audience:     "https://backend-berkah.onrender.com",
+	RedirectURL:  "https://jumatberkah.vercel.app/auth/callback",
 }
 
 // Fungsi untuk menghasilkan state string yang aman
