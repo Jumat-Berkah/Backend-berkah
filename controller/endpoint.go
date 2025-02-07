@@ -17,25 +17,26 @@ import (
 )
 
 // GetLocation handles GET requests to retrieve locations
-func GetLocation(w http.ResponseWriter, r *http.Request) {    
-    // Set CORS headers    
-    if config.SetAccessControlHeaders(w, r) {    
-        return   
-    }    
+func GetLocation(w http.ResponseWriter, r *http.Request) {
+    // Set CORS headers
+    if config.SetAccessControlHeaders(w, r) {
+        return
+    }
 
     // Set content type to JSON
     w.Header().Set("Content-Type", "application/json")
 
-    // Retrieve up to 15 locations from the database  
-    var locations []model.Location  
-    if err := config.DB.Find(&locations).Error; err != nil {  
+    // Retrieve locations from the database
+    var locations []model.Location
+    if err := config.DB.Find(&locations).Error; err != nil {
         log.Printf("Failed to retrieve locations: %v", err)
-        http.Error(w, "Could not retrieve locations", http.StatusInternalServerError)  
-        return  
-    }  
+        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+        return
+    }
 
-    // Return the locations as JSON  
-    json.NewEncoder(w).Encode(locations)  
+    // Return the locations as JSON
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(locations)
 }
 
 // CreateLocation handles POST requests to create new location data  
@@ -121,47 +122,35 @@ func UpdateLocation(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"message": "Location updated successfully"})
 }
 
-// DeleteLocation handles DELETE requests to delete existing location data  
-func DeleteLocation(w http.ResponseWriter, r *http.Request) {  
-    // Set CORS headers  
-    if config.SetAccessControlHeaders(w, r) {  
+// DeleteLocation handles DELETE requests to delete existing location data
+func DeleteLocation(w http.ResponseWriter, r *http.Request) {
+    // Set CORS headers
+    if config.SetAccessControlHeaders(w, r) {
         return
-    }  
-  
-    // Set content type to JSON  
-    w.Header().Set("Content-Type", "application/json")  
-  
+    }
+
+    // Set content type to JSON
+    w.Header().Set("Content-Type", "application/json")
+
     // Parse request body
-    var location model.Location  
-    if err := json.NewDecoder(r.Body).Decode(&location); err != nil {  
-        log.Printf("Failed to decode request body: %v", err)  
-        http.Error(w, "Invalid request body", http.StatusBadRequest)  
-        return  
-    }  
-  
-    // Validate ID  
-    if location.ID == 0 {  
-        http.Error(w, "Location ID is required", http.StatusBadRequest)  
-        return  
-    }  
-  
-    // Delete location from database
-    result := config.DB.Delete(&model.Location{}, location.ID)  
-    if result.Error != nil {  
-        log.Printf("Failed to delete location: %v", result.Error)  
-        http.Error(w, "Failed to delete location", http.StatusInternalServerError)  
-        return  
-    }  
-  
-    if result.RowsAffected == 0 {  
-        http.Error(w, "Location not found", http.StatusNotFound)  
-        return  
-    }  
-  
-    // Return success response
-    w.WriteHeader(http.StatusOK)  
-    json.NewEncoder(w).Encode(map[string]string{"message": "Location deleted successfully"})  
+    var location model.Location
+    if err := json.NewDecoder(r.Body).Decode(&location); err != nil {
+        log.Printf("Failed to decode request body: %v", err)
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)
+        return
+    }
+
+    // Delete the location from the database
+    if err := config.DB.Delete(&location, location.ID).Error; err != nil {
+        log.Printf("Failed to delete location: %v", err)
+        http.Error(w, "Failed to delete location", http.StatusInternalServerError)
+        return
+    }
+
+    // Respond with success message
+    w.WriteHeader(http.StatusNoContent) // 204 No Content
 }
+
 
 // manage user
 // GetUsers handles GET requests to retrieve all users

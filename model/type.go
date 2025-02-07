@@ -10,7 +10,8 @@ import (
 type Location struct {  
 	ID          uint      `gorm:"primaryKey" json:"id"`  
 	Name        string    `gorm:"type:varchar(100);not null" json:"name"`  
-	Address     string    `gorm:"type:text;not null" json:"address"`  
+	Address     string    `gorm:"type:text;not null" json:"address"`
+	EmbedLink   string    `gorm:"type:text" json:"embed_link"`  
 	Description string    `gorm:"type:text" json:"description"`  
 	CreatedAt   time.Time `gorm:"autoCreateTime"`      // Waktu dibuat  
 }  
