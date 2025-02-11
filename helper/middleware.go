@@ -13,6 +13,7 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // Fungsi untuk hash password
@@ -25,58 +26,66 @@ func HashPassword(password string) (string, error) {
 }
 
 
-// Middleware untuk memvalidasi role pengguna
-func RoleMiddleware(allowedRoleIDs ...uint) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Ambil token dari header Authorization
-			tokenString, err := GetTokenFromHeader(r)
-			if err != nil {
-				log.Printf("Token error: %v", err)
-				http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
-				return
-			}
+// Middleware gabungan untuk validasi token dan otorisasi role
+func AuthMiddleware(next http.Handler, allowedRoleIDs ...uint) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        tokenString, err := GetTokenFromHeader(r)
+        if err != nil {
+            log.Printf("Token error: %v", err)
+            http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+            return
+        }
 
-			// Verifikasi token JWT
-			claims := &model.Claims{}
-			if err := ParseAndValidateToken(tokenString, claims); err != nil {
-				log.Printf("Token validation error: %v", err)
-				http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
-				return
-			}
+        if IsTokenBlacklisted(tokenString) {
+            log.Printf("Token is blacklisted: %v", tokenString)
+            http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)
+            return
+        }
 
-			// Ambil role dari database berdasarkan userID
-			var user model.User
-			if err := config.DB.Preload("Role").First(&user, claims.UserID).Error; err != nil {
-				log.Printf("User not found: %v", err)
-				http.Error(w, "Unauthorized: User not found", http.StatusUnauthorized)
-				return
-			}
+        claims := &model.Claims{}
+        if err := ParseAndValidateToken(tokenString, claims); err != nil {
+            log.Printf("Token validation error: %v", err)
+            http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+            return
+        }
 
-			// Validasi apakah role ID pengguna termasuk dalam daftar allowedRoleIDs
-			roleAllowed := false
-			for _, allowedRoleID := range allowedRoleIDs {
-				if user.Role.ID == allowedRoleID {
-					roleAllowed = true
-					break
-				}
-			}
+        var user model.User
+        if err := config.DB.Preload("Role").First(&user, claims.UserID).Error; err != nil {
+            log.Printf("User not found: %v", err)
+            http.Error(w, "Unauthorized: User not found", http.StatusUnauthorized)
+            return
+        }
 
-			if !roleAllowed {
-				log.Printf("Access denied: insufficient permissions for role ID '%d'", user.Role.ID)
-				http.Error(w, "Access denied: insufficient permissions", http.StatusForbidden)
-				return
-			}
+        // Otorisasi role (opsional)
+        if allowedRoleIDs != nil { // Jika allowedRoleIDs diberikan
+            roleAllowed := false
+            for _, allowedRoleID := range allowedRoleIDs {
+                if user.Role.ID == allowedRoleID {
+                    roleAllowed = true
+                    break
+                }
+            }
 
-			// Masukkan userID dan role ke context request
-			ctx := context.WithValue(r.Context(), config.UserIDKey, claims.UserID)
-			ctx = context.WithValue(ctx, config.RoleKey, user.Role.Name)
+            if !roleAllowed {
+                log.Printf("Access denied: insufficient permissions for role ID '%d'", user.Role.ID)
+                http.Error(w, "Access denied: insufficient permissions", http.StatusForbidden)
+                return
+            }
+        }
 
-			// Lanjutkan ke handler berikutnya
-			log.Printf("Access granted: userID=%d, role=%s", claims.UserID, user.Role.Name)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
+        ctx := context.WithValue(r.Context(), config.UserIDKey, claims.UserID)
+        ctx = context.WithValue(ctx, config.RoleKey, user.Role.Name)
+
+		// Perbarui token (opsional, jika Anda ingin memperbarui token setiap request)
+		_, err = UpdateToken(config.DB, user.ID)
+		if err != nil {
+			log.Printf("Failed to update token: %v", err)
+			http.Error(w, "Failed to update token", http.StatusInternalServerError)
+			return
+		}
+
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
 }
 
 // Fungsi untuk blacklist token
@@ -112,41 +121,6 @@ func BlacklistToken(w http.ResponseWriter, r *http.Request) {
 	// Kirim respons logout berhasil
 	WriteResponse(w, http.StatusOK, map[string]string{
 		"message": "Logout successful, token has been blacklisted",
-	})
-}
-
-// Middleware untuk memvalidasi token
-func ValidateTokenMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Ambil token dari header
-		tokenString, err := GetTokenFromHeader(r)
-		if err != nil {
-			log.Printf("Token error: %v", err)
-			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
-			return
-		}
-
-		// Periksa apakah token ada di blacklist
-		if IsTokenBlacklisted(tokenString) {
-			log.Printf("Token is blacklisted: %v", tokenString)
-			http.Error(w, "Unauthorized: Token has been blacklisted", http.StatusUnauthorized)
-			return
-		}
-
-		// Verifikasi token JWT
-		claims := &model.Claims{}
-		if err := ParseAndValidateToken(tokenString, claims); err != nil {
-			log.Printf("Token validation error: %v", err)
-			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
-			return
-		}
-
-		// Masukkan userID dan role ke context request
-		ctx := context.WithValue(r.Context(), config.UserIDKey, claims.UserID)
-		ctx = context.WithValue(ctx, config.RoleKey, claims.Role)
-
-		log.Printf("Token validated successfully: userID=%d, role=%s", claims.UserID, claims.Role)
-		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -291,4 +265,26 @@ func StoreActiveToken(tokenString string, userID uint, expiresAt time.Time) erro
 		CreatedAt: time.Now(),
 	}
 	return config.DB.Create(&activeToken).Error
+}
+
+// Fungsi untuk memperbarui token (misalnya, di middleware atau handler)
+func UpdateToken(db *gorm.DB, userID uint) (string, error) {
+	// Assuming you have the role available, replace "userRole" with the actual role variable
+	token, err := GenerateToken(userID, "userRole")
+    if err != nil {
+        return "", err
+    }
+
+    expiry := time.Now().Add(time.Hour) // Token berlaku 1 jam
+
+    err = db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+        "token": token,
+        "token_expiry": expiry,
+    }).Error
+
+    if err != nil {
+        return "", err
+    }
+
+    return token, nil
 }

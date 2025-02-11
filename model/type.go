@@ -65,3 +65,9 @@ type LoginInput struct {
 	Password string `json:"password"`  
 }  
   
+type ContextKey string
+
+const (
+    UserIDKey ContextKey = "userID"
+    RoleKey   ContextKey = "role"
+)
