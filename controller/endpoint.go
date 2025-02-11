@@ -691,7 +691,7 @@ func NewPasswordHandler(w http.ResponseWriter, r *http.Request) {
     user.Password = hashedPassword
     user.ResetPasswordToken = ""
     user.ResetPasswordExpiry = time.Time{}
-    config.DB.Save(&user)
+    config.DB.Save(user)
 
     http.Redirect(w, r, "/success", http.StatusSeeOther) // Redirect ke halaman sukses
 }
