@@ -15,6 +15,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Fungsi untuk hash password
+func HashPassword(password string) (string, error) {
+    bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    if err != nil {
+        return "", err
+    }
+    return string(bytes), nil
+}
+
+
 // Middleware untuk memvalidasi role pengguna
 func RoleMiddleware(allowedRoleIDs ...uint) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

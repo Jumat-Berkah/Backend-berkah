@@ -2,18 +2,21 @@ package controller
 
 import (
 	"Backend-berkah/config"
+	"Backend-berkah/helper"
 	"Backend-berkah/model"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // GetLocation handles GET requests to retrieve locations
@@ -601,4 +604,94 @@ func ServeProfilePicture(w http.ResponseWriter, r *http.Request) {
 
     // Serve file
     http.ServeFile(w, r, filepath)
+}
+
+func SendResetPasswordEmail(email, token string) error {
+    emailUser := os.Getenv("EMAIL_USER")
+    emailPassword := os.Getenv("EMAIL_PASSWORD")
+    from := emailUser // Gunakan email dari ENV
+    password := emailPassword
+    to := []string{email}
+
+    // Pesan email (gunakan domain Anda)
+    message := []byte("Subject: Reset Password\r\n\r\n" +
+        "Klik tautan berikut untuk mereset password Anda: https://jumatberkah.vercel.app/reset-password/new-password?token=" + token) //Ganti dengan domain anda
+
+    auth := smtp.PlainAuth("", from, password, "smtp.gmail.com") // Gmail SMTP
+    err := smtp.SendMail("smtp.gmail.com:587", auth, from, to, message) // Gmail port 587
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+
+// Handler untuk permintaan reset password
+func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+    email := r.FormValue("email")
+
+    var user model.User
+    result := config.DB.Where("email = ?", email).First(&user)
+
+    if result.Error != nil {
+        if result.Error == gorm.ErrRecordNotFound {
+            http.Error(w, "Email tidak ditemukan", http.StatusNotFound)
+        } else {
+            http.Error(w, "Terjadi kesalahan database", http.StatusInternalServerError)
+        }
+        return
+    }
+
+    userID := user.ID // Assuming you have user ID available
+    email = user.Email // Assuming you have user email available
+    token, err := helper.GenerateToken(userID, email)
+    if err != nil {
+        http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+        return
+    }
+    user.ResetPasswordToken = token
+    user.ResetPasswordExpiry = time.Now().Add(time.Hour)
+    config.DB.Save(&user)
+
+    err = SendResetPasswordEmail(email, token)
+    if err != nil {
+        http.Error(w, "Gagal mengirim email", http.StatusInternalServerError)
+        fmt.Println("Error sending email:", err) // Log error
+        return
+    }
+
+    fmt.Fprintf(w, "Token reset password telah dikirim ke email anda")
+}
+
+// Handler untuk permintaan perubahan password baru
+func NewPasswordHandler(w http.ResponseWriter, r *http.Request) {
+    token := r.URL.Query().Get("token") //Ambil token dari query parameter
+    password := r.FormValue("password")
+
+    var user model.User
+    result := config.DB.Where("reset_password_token = ?", token).First(&user)
+
+    if result.Error != nil {
+        http.Error(w, "Token tidak valid", http.StatusBadRequest)
+        return
+    }
+
+    if user.ResetPasswordExpiry.Before(time.Now()) {
+        http.Error(w, "Token telah kadaluarsa", http.StatusBadRequest)
+        return
+    }
+
+    hashedPassword, err := helper.HashPassword(password) // Hash password
+    if err != nil {
+        http.Error(w, "Gagal hash password", http.StatusInternalServerError)
+        return
+    }
+
+    user.Password = hashedPassword
+    user.ResetPasswordToken = ""
+    user.ResetPasswordExpiry = time.Time{}
+    config.DB.Save(&user)
+
+    http.Redirect(w, r, "/success", http.StatusSeeOther) // Redirect ke halaman sukses
 }

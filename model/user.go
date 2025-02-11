@@ -2,6 +2,8 @@ package model
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Role model
@@ -13,24 +15,25 @@ type Role struct {
 }  
   
 // User model  
-type User struct {  
-    ID              uint      `gorm:"primaryKey"`  
-    Email           string    `gorm:"unique;not null"`  
-    Username        string    `gorm:"unique;not null"`  
-    Password        string    `gorm:"not null"`  
-    FullName        string    `json:"full_name"`
-    PhoneNumber     string    `json:"phone_number"`
-    Address         string    `json:"address"`
-    ProfilePicture  string    `json:"profile_picture"`
-    // Informasi Keagamaan
-    PreferredMasjid string    `json:"preferred_masjid"` // Masjid yang sering dikunjungi
-    DonationHistory []Donation `gorm:"foreignKey:UserID"` // Riwayat donasi
-    // Informasi Tambahan
-    Bio             string    `json:"bio"`
-    JoinDate        time.Time `gorm:"autoCreateTime"`
-    RoleID          uint      `gorm:"not null"`
-    Role            Role      `gorm:"foreignKey:RoleID"`
+type User struct {
+    gorm.Model
+    Email            string    `gorm:"unique;not null"`
+    Username         string    `gorm:"unique;not null"`
+    Password         string    `gorm:"not null"`
+    FullName         string    `json:"full_name"`
+    PhoneNumber      string    `json:"phone_number"`
+    Address          string    `json:"address"`
+    ProfilePicture   string    `json:"profile_picture"`
+    PreferredMasjid  string    `json:"preferred_masjid"`
+    DonationHistory  []Donation `gorm:"foreignKey:UserID"`
+    Bio              string    `json:"bio"`
+    JoinDate         time.Time `gorm:"autoCreateTime"`
+    RoleID           uint      `gorm:"not null"`
+    Role             Role      `gorm:"foreignKey:RoleID"`
+    ResetPasswordToken string
+    ResetPasswordExpiry time.Time
 }
+
 type Donation struct {
     ID          uint      `gorm:"primaryKey"`
     UserID      uint      `json:"user_id"`
