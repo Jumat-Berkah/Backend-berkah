@@ -626,8 +626,6 @@ func SendResetPasswordEmail(email, token string) error {
     return nil
 }
 
-
-// Handler untuk permintaan reset password
 func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
     email := r.FormValue("email")
 
@@ -654,14 +652,27 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
     user.ResetPasswordExpiry = time.Now().Add(time.Hour)
     config.DB.Save(&user)
 
-    err = SendResetPasswordEmail(email, token)
+    // Define resetLink
+    resetLink := fmt.Sprintf("https://jumatberkah.vercel.app/reset-password?token=%s", token)
+
+    err = SendResetPasswordEmail(user.Email, resetLink)
     if err != nil {
-        http.Error(w, "Gagal mengirim email", http.StatusInternalServerError)
-        fmt.Println("Error sending email:", err) // Log error
-        return
+        // Ubah penanganan error menjadi respons JSON
+        w.Header().Set("Content-Type", "application/json") // Set header content type
+        w.WriteHeader(http.StatusInternalServerError) // Tetapkan status code error (500 Internal Server Error)
+        response := map[string]interface{}{
+            "error":   "Gagal mengirim email reset password.",
+            "message": "Terjadi masalah teknis saat mengirim email. Mohon coba lagi nanti.", // Pesan error yang lebih detail (opsional)
+        }
+        json.NewEncoder(w).Encode(response) // Kirim respons JSON
+        return // Penting untuk keluar dari handler setelah mengirim error
     }
 
-    fmt.Fprintf(w, "Token reset password telah dikirim ke email anda")
+    w.Header().Set("Content-Type", "application/json") // Pastikan respons sukses juga JSON
+    responseSuccess := map[string]string{
+        "message": "Permintaan reset password berhasil dikirim. Silakan periksa email Anda.",
+    }
+    json.NewEncoder(w).Encode(responseSuccess)
 }
 
 // Handler untuk permintaan perubahan password baru
