@@ -704,10 +704,12 @@ func sendResetPasswordEmail(to, token string) error {
     if err != nil {
         return fmt.Errorf("invalid SMTP port: %v", err)
     }
-    d := gomail.NewDialer(smtpHost, port, from, password)
-	if err := d.DialAndSend(m); err != nil {
-		return err
-	}
 
-	return nil
+    d := gomail.NewDialer(smtpHost, port, from, password)
+    if err := d.DialAndSend(m); err != nil {
+        fmt.Println("Error sending email:", err) // Cetak error ke konsol
+        return fmt.Errorf("failed to send email: %v", err) // Kembalikan error yang lebih informatif
+    }
+
+    return nil
 }
