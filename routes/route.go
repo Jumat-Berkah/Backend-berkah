@@ -6,6 +6,7 @@ import (
 	"Backend-berkah/helper"
 	"log"
 	"net/http"
+	"strings"
 	// Middleware untuk autentikasi dan otorisasi JWT
 )
 
@@ -64,13 +65,11 @@ func URL(w http.ResponseWriter, r *http.Request) {
     case method == "GET" && path == "/profile-picture":
         controller.ServeProfilePicture(w, r)
     // reset password
-    case method == "POST" && path == "/resetpassword":
-        controller.ResetPasswordHandler(w, r)
-    case method == "POST" && path == "/newpassword":
-        controller.NewPasswordHandler(w, r)    
-    // get email
-    case method == "POST" && path == "/getemail":
-        controller.GetUserEmails(w, r)
+    case method == "POST" && path == "/forgotpassword":
+        controller.ForgotPassword(w, r, config.DB)
+    case method == "POST" && strings.HasPrefix(path, "/resetpassword/"):
+        token := strings.TrimPrefix(path, "/resetpassword/")
+        controller.ResetPassword(w, r, config.DB, token) 
         
     // Default route
 

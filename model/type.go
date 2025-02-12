@@ -33,6 +33,10 @@ type BlacklistToken struct {
 	CreatedAt time.Time `gorm:"autoCreateTime"` // Waktu dibuat  
 }  
   
+type request struct {
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
 // Token model  
 type Token struct {  
 	ID        uint      `gorm:"primaryKey"`  

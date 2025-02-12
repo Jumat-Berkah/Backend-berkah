@@ -30,8 +30,7 @@ type User struct {
     JoinDate         time.Time `gorm:"autoCreateTime"`
     RoleID           uint      `gorm:"not null"`
     Role             Role      `gorm:"foreignKey:RoleID"`
-    ResetPasswordToken string
-    ResetPasswordExpiry time.Time
+    ResetToken       string    `json:"reset_token"`
 }
 
 type Donation struct {
