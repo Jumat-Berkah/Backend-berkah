@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -656,7 +657,7 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
     config.DB.Save(&user)
 
     // Define resetLink
-    resetLink := fmt.Sprintf("https://jumatberkah.vercel.app/reset-password?token=%s", token)
+    resetLink := fmt.Sprintf("https://backend-berkah.onrender.com/reset-password?token=%s", token)
 
     err = SendResetPasswordEmail(user.Email, resetLink)
     if err != nil {
@@ -708,4 +709,54 @@ func NewPasswordHandler(w http.ResponseWriter, r *http.Request) {
     config.DB.Save(user)
 
     http.Redirect(w, r, "/success", http.StatusSeeOther) // Redirect ke halaman sukses
+}
+
+func GetEmailIDHandler(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("userID") // Ambil userID dari query parameter
+	if userIDStr == "" {
+		http.Error(w, "userID query parameter dibutuhkan", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 32) // Konversi userID string ke uint
+	if err != nil {
+		http.Error(w, "Format userID tidak valid", http.StatusBadRequest)
+		return
+	}
+
+	email, err := GetEmailID(uint(userID)) // Panggil fungsi GetEmailForResetByID
+	if err != nil {
+		if strings.Contains(err.Error(), "pengguna tidak ditemukan") {
+			http.Error(w, err.Error(), http.StatusNotFound) // 404 jika pengguna tidak ditemukan
+		} else {
+			http.Error(w, "Gagal mengambil email pengguna", http.StatusInternalServerError) // 500 untuk error server lainnya
+			log.Println("Error GetEmailForResetByID:", err) // Log detail error
+		}
+		return
+	}
+
+	// Jika berhasil mendapatkan email, kirim respons JSON yang berisi email
+	response := map[string]string{
+		"email":   email,
+		"message": "Email pengguna berhasil diambil dan token reset password dapat digunakan.", // Pesan tambahan untuk konfirmasi
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func GetEmailID(userID uint) (string, error) {
+	var user model.User
+	result := config.DB.First(&user, userID) // Mencari user berdasarkan ID (primary key)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return "", fmt.Errorf("pengguna tidak ditemukan dengan ID: %d", userID) // Error jika user tidak ditemukan
+		}
+		return "", fmt.Errorf("gagal mengambil data pengguna: %w", result.Error) // Error jika ada masalah database lainnya
+	}
+
+	// Setelah mendapatkan user, kita bisa memastikan token reset password dapat dibuat untuk email ini
+	// (Proses pembuatan token dan pengiriman email tetap dilakukan di handler ResetPasswordHandler)
+
+	return user.Email, nil // Mengembalikan email pengguna jika berhasil ditemukan
 }

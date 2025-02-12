@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/whatsauth/itmodel"
 )
@@ -32,4 +33,21 @@ func Jsonstr(strc interface{}) string {
 		log.Fatal(err)
 	}
 	return string(jsonData)
+}
+
+// ExtractUserID extracts the user ID from the request
+func ExtractUserID(r *http.Request) string {
+    // Assuming the user ID is passed in the Authorization header as a Bearer token
+    authHeader := r.Header.Get("Authorization")
+    if authHeader == "" {
+        return ""
+    }
+
+    // Split the header to get the token part
+    parts := strings.Split(authHeader, " ")
+    if len(parts) != 2 || parts[0] != "Bearer" {
+        return ""
+    }
+
+    return parts[1] // Assuming the token itself is the user ID
 }

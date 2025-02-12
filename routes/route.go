@@ -6,6 +6,7 @@ import (
 	"Backend-berkah/helper"
 	"log"
 	"net/http"
+	"strconv"
 	// Middleware untuk autentikasi dan otorisasi JWT
 )
 
@@ -64,10 +65,19 @@ func URL(w http.ResponseWriter, r *http.Request) {
     case method == "GET" && path == "/profile-picture":
         controller.ServeProfilePicture(w, r)
     // reset password
-    case method == "POST" && path == "/reset-password":
+    case method == "POST" && path == "/resetpassword":
         controller.ResetPasswordHandler(w, r)
-    case method == "POST" && path == "/new-password":
+    case method == "POST" && path == "/newpassword":
         controller.NewPasswordHandler(w, r)    
+    // get email
+    case method == "POST" && path == "/get/emailid":
+        userIDStr := helper.ExtractUserID(r) // Assuming you have a function to extract user ID from the request
+        userID, err := strconv.ParseUint(userIDStr, 10, 32)
+        if err != nil {
+            http.Error(w, "Invalid user ID", http.StatusBadRequest)
+            return
+        }
+        controller.GetEmailID(uint(userID))
     // Default route
 
     default:
