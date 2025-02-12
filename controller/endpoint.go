@@ -9,13 +9,13 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 )
 
@@ -607,25 +607,27 @@ func ServeProfilePicture(w http.ResponseWriter, r *http.Request) {
 }
 
 func SendResetPasswordEmail(email, token string) error {
-    emailUser := os.Getenv("EMAIL_USER")
-    emailPassword := os.Getenv("EMAIL_PASSWORD")
-    from := emailUser // Gunakan email dari ENV
-    password := emailPassword
-    to := []string{email}
+	emailUser := os.Getenv("EMAIL_USER")
+	emailPassword := os.Getenv("EMAIL_PASSWORD")
+	from := emailUser
+	to := email
 
-    // Pesan email (gunakan domain Anda)
-    message := []byte("Subject: Reset Password\r\n\r\n" +
-        "Klik tautan berikut untuk mereset password Anda: https://jumatberkah.vercel.app/reset-password/new-password?token=" + token) //Ganti dengan domain anda
+	m := gomail.NewMessage()
+	m.SetHeader("From", from)
+	m.SetHeader("To", to)
+	m.SetHeader("Subject", "Reset Password")
+	m.SetBody("text/plain", "Klik tautan berikut untuk mereset password Anda: https://jumatberkah.vercel.app/reset-password/new-password?token="+token) // Sesuaikan link domain Anda
 
-    auth := smtp.PlainAuth("", from, password, "smtp.gmail.com") // Gmail SMTP
-    err := smtp.SendMail("smtp.gmail.com:587", auth, from, to, message) // Gmail port 587
-    if err != nil {
-        return err
-    }
+	d := gomail.NewDialer("smtp.gmail.com", 587, from, emailPassword) // Konfigurasi Dialer Gmail
+	// Anda bisa menambahkan konfigurasi TLS jika diperlukan (opsional, tapi sebaiknya dipertimbangkan untuk keamanan):
+	// d.TLSConfig = &tls.Config{InsecureSkipVerify: true, ServerName: "smtp.gmail.com"}
 
-    return nil
+	if err := d.DialAndSend(m); err != nil {
+		return err
+	}
+
+	return nil
 }
-
 func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
     email := r.FormValue("email")
 
