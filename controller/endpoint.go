@@ -4,6 +4,7 @@ import (
 	"Backend-berkah/config"
 	"Backend-berkah/helper"
 	"Backend-berkah/model"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -689,16 +690,22 @@ func ResetPassword(w http.ResponseWriter, r *http.Request, db *gorm.DB, token st
 }
 
 func sendResetPasswordEmail(to, token string) error {
-	from := os.Getenv("EMAIL_FROM")
-	password := os.Getenv("EMAIL_PASSWORD")
-	smtpHost := os.Getenv("SMTP_HOST")
-	smtpPort := os.Getenv("SMTP_PORT")
+    from := os.Getenv("EMAIL_FROM")
+    password := os.Getenv("EMAIL_PASSWORD")
+    smtpHost := os.Getenv("SMTP_HOST")
+    smtpPort := os.Getenv("SMTP_PORT")
+    frontendURL := os.Getenv("FRONTEND_URL") // Tambahkan variabel environment untuk URL frontend
 
-	m := gomail.NewMessage()
-	m.SetHeader("From", from)
-	m.SetHeader("To", to)
-	m.SetHeader("Subject", "Reset Password")
-	m.SetBody("text/plain", fmt.Sprintf("Klik link berikut untuk reset password Anda: https://backend-berkah.onrender.com/reset_password/%s", token))
+    if frontendURL == "" {
+        return fmt.Errorf("FRONTEND_URL environment variable is not set")
+    }
+
+    m := gomail.NewMessage()
+    m.SetHeader("From", from)
+    m.SetHeader("To", to)
+    m.SetHeader("Subject", "Reset Password")
+    // Gunakan frontendURL di sini
+    m.SetBody("text/plain", fmt.Sprintf("Klik link berikut untuk reset password Anda: %s/reset_password/%s", frontendURL, token)) // Perubahan penting
 
     port, err := strconv.Atoi(smtpPort)
     if err != nil {
@@ -706,9 +713,14 @@ func sendResetPasswordEmail(to, token string) error {
     }
 
     d := gomail.NewDialer(smtpHost, port, from, password)
+    d.TLSConfig = &tls.Config{
+        InsecureSkipVerify: false,
+        ServerName:         smtpHost,
+    }
+
     if err := d.DialAndSend(m); err != nil {
-        fmt.Println("Error sending email:", err) // Cetak error ke konsol
-        return fmt.Errorf("failed to send email: %v", err) // Kembalikan error yang lebih informatif
+        fmt.Println("Error sending email:", err)
+        return fmt.Errorf("failed to send email: %v", err)
     }
 
     return nil
