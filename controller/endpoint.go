@@ -619,13 +619,11 @@ func SendResetPasswordEmail(email, token string) error {
 	m.SetHeader("Subject", "Reset Password")
 	m.SetBody("text/plain", "Klik tautan berikut untuk mereset password Anda: https://jumatberkah.vercel.app/reset-password/new-password?token="+token) // Sesuaikan link domain Anda
 
-	d := gomail.NewDialer("smtp.gmail.com", 587, from, emailPassword) // Konfigurasi Dialer Gmail
-	// Anda bisa menambahkan konfigurasi TLS jika diperlukan (opsional, tapi sebaiknya dipertimbangkan untuk keamanan):
-	// d.TLSConfig = &tls.Config{InsecureSkipVerify: true, ServerName: "smtp.gmail.com"}
+	d := gomail.NewDialer("smtp.gmail.com", 587, from, emailPassword)
 
 	if err := d.DialAndSend(m); err != nil {
-		log.Println("ERROR: Gagal mengirim email reset password ke:", email) // Tambahkan log error!
-		log.Println("Detail error:", err) // Tambahkan detail error!
+		log.Println("ERROR: Gagal mengirim email reset password ke:", email) // LOG ERROR DISINI!
+		log.Println("Detail error:", err) // LOG DETAIL ERROR DISINI!
 		return err
 	}
 
