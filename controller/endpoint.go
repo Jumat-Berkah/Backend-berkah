@@ -603,6 +603,7 @@ func ServeProfilePicture(w http.ResponseWriter, r *http.Request) {
     }
 
     // Serve file
+
     http.ServeFile(w, r, filepath)
 }
 
@@ -623,6 +624,8 @@ func SendResetPasswordEmail(email, token string) error {
 	// d.TLSConfig = &tls.Config{InsecureSkipVerify: true, ServerName: "smtp.gmail.com"}
 
 	if err := d.DialAndSend(m); err != nil {
+		log.Println("ERROR: Gagal mengirim email reset password ke:", email) // Tambahkan log error!
+		log.Println("Detail error:", err) // Tambahkan detail error!
 		return err
 	}
 
