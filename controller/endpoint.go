@@ -727,14 +727,7 @@ func GetUserEmails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-
-	// Extract emails from users
-	var emails []string
-	for _, user := range users {
-		emails = append(emails, user.Email)
-	}
-
 	// Return the emails as JSON
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(emails)
+	json.NewEncoder(w).Encode(users)
 }
