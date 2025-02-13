@@ -143,23 +143,19 @@ func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Generate state string untuk keamanan
     state := config.GenerateStateString()
-    
-    // Simpan state ke session atau cookie
-    // Contoh menggunakan cookie:
+
     http.SetCookie(w, &http.Cookie{
         Name:     "oauthstate",
         Value:    state,
         Expires:  time.Now().Add(10 * time.Minute),
         HttpOnly: true,
-        Secure:   true, // Ganti dengan true jika menggunakan HTTPS
+        Secure:   true, // Ganti true jika menggunakan HTTPS
         SameSite: http.SameSiteNoneMode, // Gunakan dengan hati-hati
         Path:     "/",
         Domain:   "jumatberkah.vercel.app", // Ganti dengan domain Anda
     })
 
-    // Redirect ke halaman consent Google
     url := config.GoogleOauthConfig.AuthCodeURL(state)
     http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
@@ -169,7 +165,6 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Ambil state dari cookie
     oauthCookie, err := r.Cookie("oauthstate")
     if err != nil {
         http.Error(w, "State cookie not found", http.StatusBadRequest)
@@ -181,14 +176,12 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Exchange authorization code dengan token
     token, err := config.GoogleOauthConfig.Exchange(r.Context(), r.FormValue("code"))
     if err != nil {
         http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
         return
     }
 
-    // Ambil info user dari Google
     client := config.GoogleOauthConfig.Client(r.Context(), token)
     userInfo, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
     if err != nil {
@@ -198,8 +191,10 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     defer userInfo.Body.Close()
 
     var googleUser struct {
-        Email string `json:"email"`
-        Name  string `json:"name"`
+        Email    string `json:"email"`
+        Name     string `json:"name"`
+        Picture  string `json:"picture"`
+        GoogleID string `json:"sub"`
     }
 
     if err := json.NewDecoder(userInfo.Body).Decode(&googleUser); err != nil {
@@ -207,42 +202,39 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Cek apakah user sudah ada di database
-    var user model.User
-    result := config.DB.Where("email = ?", googleUser.Email).First(&user)
-    
+    var user model.GoogleUser
+    result := config.DB.Where("google_id = ?", googleUser.GoogleID).First(&user)
+
     if result.Error != nil {
-        // Jika user belum ada, buat user baru
-        user = model.User{
+        user = model.GoogleUser{
+            GoogleID: googleUser.GoogleID,
             Email:    googleUser.Email,
-            Username: googleUser.Name,
-            RoleID:   1, // Role user biasa
+            Name:     googleUser.Name,
+            Picture:  googleUser.Picture,
+            RoleID:   1,
+            IsActive: true,
         }
-        
+
         if err := config.DB.Create(&user).Error; err != nil {
             http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
             return
         }
+    } else {
+        if err := config.DB.Model(&user).Update("last_login", time.Now()).Error; err != nil {
+            http.Error(w, "Failed to update last login: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
     }
 
-     // Generate JWT token
-     jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
-     if err != nil {
-         http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
-         return
-     }
- 
-     // Tentukan redirect URL berdasarkan role
-     var redirectURL string
-     if user.Role.Name == "admin" {
-         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/admin/admin.html?token=%s", jwtToken)
-     } else {
-         redirectURL = fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", jwtToken)
-     }
- 
-     // Redirect ke homepage
-     http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
- }
+    jwtToken, err := helper.GenerateToken(user.ID, user.Role.Name)
+    if err != nil {
+        http.Error(w, "Failed to generate token: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    redirectURL := fmt.Sprintf("https://jumatberkah.vercel.app/?token=%s", jwtToken) // Redirect ke domain yang sama
+    http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+}
 
 
 
