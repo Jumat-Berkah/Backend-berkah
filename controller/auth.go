@@ -151,7 +151,7 @@ func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
         Expires:  time.Now().Add(10 * time.Minute),
         HttpOnly: true,
         Secure:   true, // Ganti true jika menggunakan HTTPS
-        SameSite: http.SameSiteNoneMode, // Gunakan dengan hati-hati
+        SameSite: http.SameSiteNoneMode, // Gunakan dengan hati-hati, atau Strict jika bukan HTTPS
         Path:     "/",
         Domain:   "jumatberkah.vercel.app", // Ganti dengan domain Anda
     })
@@ -167,9 +167,12 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 
     oauthCookie, err := r.Cookie("oauthstate")
     if err != nil {
+        fmt.Println("Error getting oauthstate cookie:", err) // Tambahkan log
         http.Error(w, "State cookie not found", http.StatusBadRequest)
         return
     }
+
+    fmt.Println("oauthstate cookie value:", oauthCookie.Value)
 
     if r.FormValue("state") != oauthCookie.Value {
         http.Error(w, "Invalid oauth state", http.StatusBadRequest)
