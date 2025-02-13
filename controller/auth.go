@@ -153,9 +153,10 @@ func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
         Value:    state,
         Expires:  time.Now().Add(10 * time.Minute),
         HttpOnly: true,
-        Secure:   true,
+        Secure:   true, // Harus true jika SameSite=None
+        SameSite: http.SameSiteNoneMode, // Gunakan dengan hati-hati
         Path:     "/",
-        Domain:   "jumatberkah.vercel.app",
+        Domain:   "jumatberkah.vercel.app", // Ganti dengan domain Anda
     })
 
     // Redirect ke halaman consent Google
