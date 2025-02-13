@@ -153,7 +153,7 @@ func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
         Value:    state,
         Expires:  time.Now().Add(10 * time.Minute),
         HttpOnly: true,
-        Secure:   true, // Harus true jika SameSite=None
+        Secure:   true, // Ganti dengan true jika menggunakan HTTPS
         SameSite: http.SameSiteNoneMode, // Gunakan dengan hati-hati
         Path:     "/",
         Domain:   "jumatberkah.vercel.app", // Ganti dengan domain Anda
