@@ -235,7 +235,7 @@ func HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    redirectURL := fmt.Sprintf("https://backend-berkah.onrender.com/?token=%s", jwtToken) // Redirect ke domain yang sama
+    redirectURL := fmt.Sprintf("https://jumatberkah.vercel.app?token=%s", jwtToken) // Redirect ke domain yang sama
     http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
