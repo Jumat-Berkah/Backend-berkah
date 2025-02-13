@@ -725,3 +725,42 @@ func sendResetPasswordEmail(to, token string) error {
 
     return nil
 }
+
+func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
+	// Ambil token dari header Authorization
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		http.Error(w, "Unauthorized: Token tidak ditemukan", http.StatusUnauthorized)
+		return
+	}
+
+	// Validasi token
+    var claims model.Claims
+    if err := helper.ParseAndValidateToken(tokenString, &claims); err != nil {
+        http.Error(w, "Unauthorized: Token tidak valid", http.StatusUnauthorized)
+        return
+    }
+
+	// Token valid, user terautentikasi
+	userID := claims.UserID
+	userRole := claims.Role
+
+	// Logika untuk mengambil atau memproses data yang dilindungi
+	data, err := ambilDataProtected(userID, userRole) // Contoh fungsi
+	if err != nil {
+		http.Error(w, "Internal Server Error: Gagal mengambil data", http.StatusInternalServerError)
+		return
+	}
+
+	// Kembalikan data yang dilindungi
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func ambilDataProtected(userID uint, userRole string) ([]byte, error) {
+	// Implementasikan logika Anda di sini untuk mengambil data berdasarkan user ID dan role
+	// Contoh:
+	message := fmt.Sprintf("Selamat datang, User ID: %d, Role: %s! Ini data protected Anda.", userID, userRole)
+	return json.Marshal(map[string]string{"message": message})
+}
