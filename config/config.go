@@ -20,7 +20,6 @@ var JwtKey []byte
 
 var (
     GoogleOauthConfig = oauth2.Config{
-        RedirectURL:  os.Getenv("AUTH0_CALLBACK_URL"),
         ClientID:     os.Getenv("CLIENT_ID"),
         ClientSecret: os.Getenv("CLIENT_SECRET"),
         Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
